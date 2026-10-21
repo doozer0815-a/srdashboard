@@ -12,6 +12,13 @@ type ShotFilter interface {
 	AllowShot(rng int) bool
 }
 
+// DiscTypeShotFilter optionally rejects target types before they enter live
+// state. Implementations can use the plugin assigned to a range to decide
+// whether a target type belongs to the active game.
+type DiscTypeShotFilter interface {
+	AllowDiscTypeShot(rng int, discTypeRaw string, discType string) bool
+}
+
 // Pipeline is the shot path after the UDP socket: decode, validate, apply, notify.
 // Live OpticScore and every synthetic injector must go through Ingest.
 type Pipeline struct {
@@ -66,6 +73,9 @@ func (p *Pipeline) ingest(data []byte, verbose bool) int {
 			}
 			continue
 		}
+		// Keep the incoming DiscTypeRaw distinct until the target filter has
+		// decided whether the raw identifier itself is acceptable. In particular,
+		// Darts must not accept a missing raw ID just because DiscType says fun_dart.
 		if shot.Shooter != nil {
 			warnIfReplacementInName(shot.Shooter.Firstname, shot.Shooter.Lastname)
 		}
@@ -81,6 +91,17 @@ func (p *Pipeline) ingest(data []byte, verbose bool) int {
 				log.Printf("UDP: dropped shot for unconfigured or inactive range=%d", rng)
 			}
 			continue
+		}
+		if filter, ok := p.Filter.(DiscTypeShotFilter); ok && !filter.AllowDiscTypeShot(rng, shot.DiscTypeRaw, shot.DiscType) {
+			if verbose {
+				log.Printf("UDP: dropped disc type %q for range=%d (not accepted by active plugin)", shot.DiscTypeRaw, rng)
+			}
+			continue
+		}
+		// Legacy/normal targets may omit DiscTypeRaw. After the policy gate, use
+		// DiscType as a display/logic fallback without losing the raw-ID distinction.
+		if shot.DiscTypeRaw == "" {
+			shot.DiscTypeRaw = shot.DiscType
 		}
 		if err := ValidateShot(&shot); err != nil {
 			log.Printf("UDP: dropped inconsistent shot range=%d X=%d Y=%d Distance=%.1f FullValue=%d DecValue=%.1f: %v",
@@ -107,14 +128,15 @@ func (p *Pipeline) ingest(data []byte, verbose bool) int {
 		}
 		if p.OnShot != nil {
 			s := state.Shot{
-				X:          shot.X,
-				Y:          shot.Y,
-				Distance:   shot.Distance,
-				FullValue:  shot.FullValue,
-				DecValue:   shot.DecValue,
-				IsWarmup:   shot.IsWarmup,
-				IsHot:      shot.IsHot,
-				ReceivedAt: applyReceived,
+				X:           shot.X,
+				Y:           shot.Y,
+				Distance:    shot.Distance,
+				FullValue:   shot.FullValue,
+				DecValue:    shot.DecValue,
+				DiscTypeRaw: shot.DiscTypeRaw,
+				IsWarmup:    shot.IsWarmup,
+				IsHot:       shot.IsHot,
+				ReceivedAt:  applyReceived,
 			}
 			if hasShotAt {
 				s.At = shotAt

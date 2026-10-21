@@ -14,6 +14,7 @@ import (
 	_ "srdashboard/host/games/bankoderrisiko"
 	_ "srdashboard/host/games/barrikade"
 	_ "srdashboard/host/games/biathlon"
+	_ "srdashboard/host/games/darts"
 	_ "srdashboard/host/games/foxontherun"
 	_ "srdashboard/host/games/kettenreaktion"
 	_ "srdashboard/host/games/kopokal"
@@ -180,6 +181,35 @@ func (h *Host) firePacket(rangeNum int, dec float64, opts udp.ShotPacketOpts) {
 	}
 }
 
+func (h *Host) firePacketExplicit(rangeNum int, opts udp.ShotPacketOpts) {
+	h.T.Helper()
+
+	before := h.Live.ShotNumber(rangeNum)
+
+	opts.Range = rangeNum
+
+	if opts.DiscType == "" {
+		opts.DiscType = "LG"
+	}
+
+	if opts.ShotAt.IsZero() {
+		opts.ShotAt = time.Now()
+	}
+
+	data, err := udp.BuildShotPacket(opts)
+	if err != nil {
+		h.T.Fatalf("build explicit shot: %v", err)
+	}
+
+	udp.IngestPacket(h.Live, func(rng int, shot state.Shot, idx int) {
+		h.shotIndex[rng] = idx
+		h.PS.OnShot(rng, shot, idx)
+	}, data)
+
+	if h.Live.ShotNumber(rangeNum) == before {
+		h.T.Fatalf("udp pipeline dropped explicit shot range=%d value=%d", rangeNum, opts.FullValue)
+	}
+}
 func (h *Host) VM(rangeNum int) map[string]any {
 	h.T.Helper()
 	snap := h.PS.SnapshotRange(rangeNum)

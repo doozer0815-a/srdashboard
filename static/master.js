@@ -35,6 +35,7 @@
     if (installed) return installed.mode === 'shared';
     return id === 'autorennen' || id === 'fox-on-the-run' ||
       id === 'zehner-bingo' || id === 'barrikade' || id === 'ludo' ||
+      id === 'darts' ||
       id === 'tauziehen' || id === 'kettenreaktion' || id === 'biathlon' ||
       id === 'schrumpfender-kreis' || id === 'kronen-duell' ||
       id === 'bank-oder-risiko' || id === 'ko-pokal' || id === 'schiessgolf' ||
@@ -347,7 +348,8 @@
     // must not see a lane id here or they paint the shooter layout on the hall screen.
     const viewModel = Object.assign({}, (session && session.viewModel) || {}, {
       rangeNum: 0,
-      events: (session && session.events) || []
+      events: (session && session.events) || [],
+      inactiveRanges: (core.config && core.config.inactiveRanges) || []
     });
     if (viewModel.race && viewModel.race.cars && core.lastLiveData) {
       const lives = core.lastLiveData.ranges || [];
@@ -977,7 +979,7 @@
     if (race) {
       const shared = isSharedPlugin();
       const id = currentPluginId();
-      race.hidden = !shared || !canControlUI() || isDisplayPlugin();
+      race.hidden = !shared || !canControlUI() || isDisplayPlugin() || id === 'darts';
       const startBtn = document.getElementById('race-start-btn');
       const punctureBtn = document.getElementById('race-puncture-btn');
       const oilBtn = document.getElementById('race-oil-btn');
@@ -1003,6 +1005,10 @@
         if (oilBtn) oilBtn.hidden = true;
       } else if (id === 'ludo') {
         if (startBtn) startBtn.textContent = 'Ludo starten';
+        if (punctureBtn) punctureBtn.hidden = true;
+        if (oilBtn) oilBtn.hidden = true;
+      } else if (id === 'darts') {
+        if (startBtn) startBtn.textContent = 'Dart starten';
         if (punctureBtn) punctureBtn.hidden = true;
         if (oilBtn) oilBtn.hidden = true;
       } else if (id === 'tauziehen') {

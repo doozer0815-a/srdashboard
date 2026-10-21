@@ -12,15 +12,16 @@ import (
 
 // Shot represents a single shot on the target
 type Shot struct {
-	X          int       `json:"x"`
-	Y          int       `json:"y"`
-	Distance   float64   `json:"distance"`
-	FullValue  int       `json:"fullValue"`
-	DecValue   float64   `json:"decValue"`
-	IsWarmup   bool      `json:"isWarmup"`
-	IsHot      bool      `json:"isHot,omitempty"`      // DISAG Wertungsschuss; omitted when unknown
-	At         time.Time `json:"at,omitempty"`         // OpticScore ShotDateTime when available
-	ReceivedAt time.Time `json:"receivedAt,omitempty"` // Server time when UDP packet was handled
+	X           int       `json:"x"`
+	Y           int       `json:"y"`
+	Distance    float64   `json:"distance"`
+	FullValue   int       `json:"fullValue"`
+	DecValue    float64   `json:"decValue"`
+	DiscTypeRaw string    `json:"discTypeRaw,omitempty"`
+	IsWarmup    bool      `json:"isWarmup"`
+	IsHot       bool      `json:"isHot,omitempty"`      // DISAG Wertungsschuss; omitted when unknown
+	At          time.Time `json:"at,omitempty"`         // OpticScore ShotDateTime when available
+	ReceivedAt  time.Time `json:"receivedAt,omitempty"` // Server time when UDP packet was handled
 }
 
 // RangeState holds the live state for one shooting range
@@ -464,15 +465,16 @@ func (ls *LiveState) ApplyShotAt(rng int, sp *ShotPayload, at, receivedAt time.T
 	}
 
 	shot := Shot{
-		X:          sp.X,
-		Y:          sp.Y,
-		Distance:   sp.Distance,
-		FullValue:  sp.FullValue,
-		DecValue:   sp.DecValue,
-		IsWarmup:   sp.IsWarmup,
-		IsHot:      sp.IsHot,
-		At:         at,
-		ReceivedAt: receivedAt,
+		X:           sp.X,
+		Y:           sp.Y,
+		Distance:    sp.Distance,
+		FullValue:   sp.FullValue,
+		DecValue:    sp.DecValue,
+		DiscTypeRaw: sp.DiscTypeRaw,
+		IsWarmup:    sp.IsWarmup,
+		IsHot:       sp.IsHot,
+		At:          at,
+		ReceivedAt:  receivedAt,
 	}
 
 	enteringWarmup := !rs.IsWarmup && sp.IsWarmup

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"srdashboard/config"
 )
@@ -66,6 +67,50 @@ func (h *Handlers) AllowShot(rng int) bool {
 		return false
 	}
 	return !h.isRangeInactive(rng)
+}
+
+// AllowDiscTypeShot rejects all fun_* target types before they enter live state,
+// except fun_dart on a range assigned to the Darts plugin. Darts must not count
+// any other fun_* target, and other plugins must not count any fun_* target.
+func (h *Handlers) AllowDiscTypeShot(rng int, discTypeRaw string, discType string) bool {
+	// Use the plugin manager's active ID as the source of truth. A per-range
+	// snapshot can be stale while a plugin activation is being switched.
+	pluginID := ""
+	if h != nil && h.PluginState != nil {
+		pluginID = h.PluginState.ActivePluginID()
+	}
+	if pluginID == "" && h != nil {
+		pluginID = h.cfgSnapshot().Plugins.Active
+	}
+
+	raw := strings.TrimSpace(discTypeRaw)
+	fallback := strings.TrimSpace(discType)
+	if raw == "" {
+		// Non-Darts plugins still need to reject fun_* targets on older payloads
+		// that omit DiscTypeRaw. Darts does not use this fallback for acceptance.
+		raw = fallback
+	}
+	normalized := normalizeDiscTypeID(raw)
+	allowed := true
+	if strings.EqualFold(strings.TrimSpace(pluginID), "darts") {
+		// Darts is deliberately strict: only the actual DiscTypeRaw identifier
+		// "fun_dart" is allowed. LG/LP/KK, missing/aliased IDs and every other
+		// fun_* target must be dropped before LiveState is changed.
+		allowed = strings.TrimSpace(discTypeRaw) == "fun_dart"
+	} else {
+		// All other plugins ignore every fun_* target, including case and
+		// separator variants, but keep normal target types.
+		allowed = !strings.HasPrefix(normalized, "fun_")
+	}
+	if !allowed {
+		log.Printf("UDP target filter: rejected DiscTypeRaw=%q DiscType=%q range=%d activePlugin=%q", discTypeRaw, discType, rng, pluginID)
+	}
+	return allowed
+}
+
+func normalizeDiscTypeID(raw string) string {
+	discType := strings.ToLower(strings.TrimSpace(raw))
+	return strings.NewReplacer("-", "_", " ", "_").Replace(discType)
 }
 
 // ServeRuntime handles GET/PUT /api/runtime — this process's inactive lanes.

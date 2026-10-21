@@ -15,6 +15,7 @@ import (
 	_ "srdashboard/host/games/bankoderrisiko"
 	_ "srdashboard/host/games/barrikade"
 	_ "srdashboard/host/games/biathlon"
+	_ "srdashboard/host/games/darts"
 	_ "srdashboard/host/games/foxontherun"
 	_ "srdashboard/host/games/kettenreaktion"
 	_ "srdashboard/host/games/kopokal"
@@ -43,6 +44,8 @@ func TestRenamedPluginAssetsServedForGUI(t *testing.T) {
 		"/plugins/autorennen/assets/circuits/hafenpark.svg",
 		"/plugins/autorennen/assets/circuits/langring.svg",
 		"/plugins/ludo/view.js",
+		"/plugins/darts/view.js",
+		"/plugins/darts/theme.css",
 		"/plugins/ludo/theme.css",
 		"/plugins/barrikade/view.js",
 		"/plugins/barrikade/theme.css",

@@ -65,7 +65,7 @@ func TestEveryPluginIdMatchesFolderManifestAndView(t *testing.T) {
 	}
 	want := []string{
 		"analyse", "ansage-duell", "autorennen", "bank-oder-risiko", "barrikade", "biathlon",
-		"classic-range", "classic-range-condensed", "fox-on-the-run", "kettenreaktion", "ko-pokal",
+		"classic-range", "classic-range-condensed", "darts", "fox-on-the-run", "kettenreaktion", "ko-pokal",
 		"kronen-duell", "ludo", "schiessgolf", "schrumpfender-kreis",
 		"tannebaum-einzel", "tannebaum-team", "tauziehen", "turmbau", "zehner-bingo",
 	}

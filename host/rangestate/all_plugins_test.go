@@ -10,6 +10,7 @@ import (
 	_ "srdashboard/host/games/bankoderrisiko"
 	_ "srdashboard/host/games/barrikade"
 	_ "srdashboard/host/games/biathlon"
+	_ "srdashboard/host/games/darts"
 	_ "srdashboard/host/games/foxontherun"
 	_ "srdashboard/host/games/kettenreaktion"
 	_ "srdashboard/host/games/kopokal"
@@ -41,7 +42,7 @@ func TestAllBundledPluginsLoadAndActivate(t *testing.T) {
 	}
 	want := []string{
 		"analyse", "ansage-duell", "autorennen", "bank-oder-risiko", "barrikade", "biathlon",
-		"classic-range", "classic-range-condensed", "fox-on-the-run", "kettenreaktion", "ko-pokal",
+		"classic-range", "classic-range-condensed", "darts", "fox-on-the-run", "kettenreaktion", "ko-pokal",
 		"kronen-duell", "ludo", "schiessgolf", "schrumpfender-kreis",
 		"tannebaum-einzel", "tannebaum-team", "tauziehen", "turmbau", "zehner-bingo",
 	}

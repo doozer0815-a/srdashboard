@@ -1,0 +1,43 @@
+{
+  "title": "Dart 301 / 501 / 701 / Cricket",
+  "summary": "Drei Darts pro Aufnahme. Der Rest wird heruntergespielt; bei Double Out muss der letzte Dart ein Double sein.",
+  "sections": [
+    {
+      "heading": "Startwert",
+      "paragraphs": [
+        "Das Spiel startet je nach Einstellung mit 301, 501 oder 701 Punkten."
+      ]
+    },
+    {
+      "heading": "Double In",
+      "paragraphs": [
+        "Bei Double In werden Punkte erst ab dem ersten Double gewertet. Ein Bullseye zählt dabei als Double."
+      ]
+    },
+    {
+      "heading": "Double Out",
+      "paragraphs": [
+        "Bei Double Out muss der Dart, der den Rest auf 0 bringt, ein Double sein. Ein Rest von 1 ist damit nicht ausspielbar und führt beim weiteren Versuch zum Bust."
+      ]
+    },
+    {
+      "heading": "Bust",
+      "paragraphs": [
+        "Wird der Rest unter 0 gespielt oder bei Double Out auf 1 bzw. auf 0 ohne Double gebracht, ist die komplette Aufnahme ungültig und der Spieler erhält den Restwert vom Beginn der Aufnahme zurück."
+      ]
+    },
+    {
+      "heading": "Scheibentyp",
+      "paragraphs": [
+        "Verarbeitet werden ausschließlich DISAG-Schüsse mit DiscTypeRaw = fun_dart. Andere Scheibentypen verändern den Spielstand nicht."
+      ]
+    },
+    {
+      "heading": "Standard Cricket",
+      "paragraphs": [
+        "Es zählen die Zahlen 20, 19, 18, 17, 16, 15 und Bull. Jede Zahl muss dreimal getroffen werden; Double zählt zwei Treffer, Triple drei Treffer. Outer Bull zählt einen Treffer, Bullseye zwei Treffer.",
+        "Punkte gibt es nur für bereits geschlossene Zahlen, solange mindestens ein Gegner diese Zahl noch offen hat. Es gewinnt, wer alle Ziele geschlossen hat und mindestens so viele Punkte wie jeder Gegner erzielt hat."
+      ]
+    }
+  ]
+}

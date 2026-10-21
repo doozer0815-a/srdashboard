@@ -22,6 +22,7 @@ import (
 	_ "srdashboard/host/games/bankoderrisiko"
 	_ "srdashboard/host/games/barrikade"
 	_ "srdashboard/host/games/biathlon"
+        _ "srdashboard/host/games/darts"
 	_ "srdashboard/host/games/foxontherun"
 	_ "srdashboard/host/games/kettenreaktion"
 	_ "srdashboard/host/games/kopokal"

@@ -3,6 +3,7 @@ package fullplay
 import (
 	"testing"
 
+	"srdashboard/state"
 	"srdashboard/udp"
 )
 
@@ -311,4 +312,101 @@ func playBankOderRisiko(t *testing.T, h *Host) {
 		}
 	}
 	h.requirePhase(path, "finished")
+}
+func playDarts(t *testing.T, h *Host) {
+	t.Helper()
+
+	h.Control("start", map[string]any{
+		"startingScore": 301,
+		"doubleIn":      false,
+		"doubleOut":     false,
+		"orderMode":     "beginner",
+		"beginnerRange": 1,
+	})
+
+	h.requireBothRangesPaint()
+
+	game := nest(h.VM(1), "game")
+	if game == nil {
+		t.Fatal("missing darts game view model")
+	}
+	if got := asInt(game["activeRange"]); got != 1 {
+		t.Fatalf("darts activeRange=%d want 1", got)
+	}
+
+	fire := func(rangeNum, value int, distance float64, discTypeRaw string) {
+		idx := h.shotIndex[rangeNum] + 1
+		h.shotIndex[rangeNum] = idx
+		h.PS.OnShot(rangeNum, state.Shot{
+			X:           100,
+			Y:           -100,
+			Distance:    distance,
+			FullValue:   value,
+			DecValue:    float64(value),
+			DiscTypeRaw: discTypeRaw,
+		}, idx)
+	}
+
+	playerScore := func(rangeNum int) int {
+		game := nest(h.VM(1), "game")
+		for _, raw := range asSlice(game["players"]) {
+			p, _ := raw.(map[string]any)
+			if asInt(p["rangeNum"]) == rangeNum {
+				return asInt(p["score"])
+			}
+		}
+		return -1
+	}
+
+	// Nicht-Dart-Scheiben dürfen den Spielstand nicht verändern.
+	before := playerScore(1)
+	fire(1, 20, 1030, "LG")
+	if got := playerScore(1); got != before {
+		t.Fatalf("non-fun_dart changed score: got %d want %d", got, before)
+	}
+
+	// Stand 1: T20 + T20 + T20 = 180; 301 -> 121.
+	for i := 0; i < 3; i++ {
+		fire(1, 60, 4000, "fun_dart")
+	}
+	if got := playerScore(1); got != 121 {
+		t.Fatalf("stand 1 after first round score=%d want 121", got)
+	}
+	// Nach dem dritten Dart ist zunächst kein Spieler aktiv, solange die
+	// Audioansagen laufen. Der Frontend-Callback simulieren wir hier mit
+	// next_turn und prüfen danach den tatsächlich aktivierten Spieler.
+	if got := asInt(nest(h.VM(1), "game")["activeRange"]); got != 0 {
+		t.Fatalf("after stand 1 turn activeRange=%d want 0 while audio plays", got)
+	}
+	h.Control("next_turn", nil)
+	if got := asInt(nest(h.VM(1), "game")["activeRange"]); got != 2 {
+		t.Fatalf("after audio for stand 1 activeRange=%d want 2", got)
+	}
+
+	// Stand 2: drei Misses, danach läuft ebenfalls erst die Audiosequenz.
+	for i := 0; i < 3; i++ {
+		fire(2, 0, 2300, "fun_dart")
+	}
+	if got := asInt(nest(h.VM(1), "game")["activeRange"]); got != 0 {
+		t.Fatalf("after stand 2 turn activeRange=%d want 0 while audio plays", got)
+	}
+	h.Control("next_turn", nil)
+	if got := asInt(nest(h.VM(1), "game")["activeRange"]); got != 1 {
+		t.Fatalf("after audio for stand 2 activeRange=%d want 1", got)
+	}
+
+	// Stand 1: T20 + T20 + S1 = 121 -> 0.
+	fire(1, 60, 4000, "fun_dart")
+	fire(1, 60, 4000, "fun_dart")
+	fire(1, 1, 2000, "fun_dart")
+
+	h.requirePhase([]string{"game", "phase"}, "finished")
+
+	game = nest(h.VM(1), "game")
+	if got := asInt(game["winnerRange"]); got != 1 {
+		t.Fatalf("darts winnerRange=%d want 1", got)
+	}
+	if n := len(asSlice(game["boardDarts"])); n != 3 {
+		t.Fatalf("darts boardDarts=%d want 3 final-round hits", n)
+	}
 }

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin id="darts" label="Dart" version="1.0.0" mode="shared" kind="game">
+  <description>301, 501, 701 oder Standard Cricket; X01 mit optional Double In und Double Out. Nur DISAG-Schüsse der Scheibe fun_dart werden verarbeitet.</description>
+  <entrypoints view="view.js" theme="theme.css" logic="builtin"/>
+  <config>
+    <gameMode>x01</gameMode>
+    <startingScore>501</startingScore>
+    <doubleIn>false</doubleIn>
+    <doubleOut>true</doubleOut>
+    <orderMode>range</orderMode>
+    <beginnerRange>1</beginnerRange>
+    <autoStartWhenAllReady>false</autoStartWhenAllReady>
+    <distanceUnitsPerMm>100</distanceUnitsPerMm>
+    <boardRadiusMm>70</boardRadiusMm>
+    <tripleInnerRadiusMm>36.8</tripleInnerRadiusMm>
+    <tripleOuterRadiusMm>44.3</tripleOuterRadiusMm>
+    <doubleInnerRadiusMm>61</doubleInnerRadiusMm>
+    <doubleOuterRadiusMm>69.5</doubleOuterRadiusMm>
+    <outerBullRadiusMm>9</outerBullRadiusMm>
+    <bullRadiusMm>4</bullRadiusMm>
+  </config>
+</plugin>
