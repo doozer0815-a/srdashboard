@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	_ "srdashboard/host/games/darts"
 	_ "srdashboard/host/games/ludo"
 	"srdashboard/host/loader"
 	"srdashboard/state"
@@ -123,4 +124,68 @@ func copyDir(src, dst string) error {
 		}
 		return os.WriteFile(target, data, 0644)
 	})
+}
+
+func TestFunDartShotIgnoredByNonDartsPlugin(t *testing.T) {
+	dir := t.TempDir()
+	pluginsRoot := filepath.Join(dir, "plugins")
+	src := filepath.Join("..", "..", "plugins", "classic-range")
+	if _, err := os.Stat(src); err != nil {
+		t.Skip("classic-range not present")
+	}
+	if err := copyDir(src, filepath.Join(pluginsRoot, "classic-range")); err != nil {
+		t.Fatal(err)
+	}
+
+	pm := loader.NewManager(pluginsRoot)
+	if err := pm.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	ps := NewManager(1, pm, "classic-range")
+	if err := ps.EnsureActive(); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, discType := range []string{"fun_dart", "FUN_DART", "fun-dart", "Fun Dart", "fun_biathlon", "FUN_OTHER", "fun-target"} {
+		ps.OnShot(1, state.Shot{DiscTypeRaw: discType, DecValue: 50, FullValue: 50}, 1)
+		if got := ps.SnapshotRange(1).ShotCount; got != 0 {
+			t.Fatalf("DiscTypeRaw %q counted as a shot: ShotCount=%d", discType, got)
+		}
+	}
+
+	ps.OnShot(1, state.Shot{DiscTypeRaw: "LG", DecValue: 10.5, FullValue: 10}, 1)
+	if got := ps.SnapshotRange(1).ShotCount; got != 1 {
+		t.Fatalf("normal LG shot should count; ShotCount=%d", got)
+	}
+}
+
+func TestDartsManagerIgnoresEveryShotExceptExactFunDart(t *testing.T) {
+	dir := t.TempDir()
+	pluginsRoot := filepath.Join(dir, "plugins")
+	src := filepath.Join("..", "..", "plugins", "darts")
+	if _, err := os.Stat(src); err != nil {
+		t.Skip("darts plugin assets not present")
+	}
+	if err := copyDir(src, filepath.Join(pluginsRoot, "darts")); err != nil {
+		t.Fatal(err)
+	}
+	pm := loader.NewManager(pluginsRoot)
+	if err := pm.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	ps := NewManager(1, pm, "darts")
+	if err := ps.EnsureActive(); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, discType := range []string{"LG", "LP", "KK", "fun_biathlon", "FUN-DART", "FUN_DART"} {
+		ps.OnShot(1, state.Shot{DiscTypeRaw: discType, DecValue: 10.5, FullValue: 10}, 1)
+		if got := ps.SnapshotRange(1).ShotCount; got != 0 {
+			t.Fatalf("DiscTypeRaw %q must be ignored by Darts, ShotCount=%d", discType, got)
+		}
+	}
+	ps.OnShot(1, state.Shot{DiscTypeRaw: "fun_dart", DecValue: 50, FullValue: 50}, 1)
+	if got := ps.SnapshotRange(1).ShotCount; got != 1 {
+		t.Fatalf("exact fun_dart should be accepted by Darts, ShotCount=%d", got)
+	}
 }

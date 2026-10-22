@@ -43,6 +43,8 @@ type wsClient struct {
 	hub    *Hub
 	conn   *websocket.Conn
 	filter int // 0 = all ranges
+	audioReceiver bool
+	audioSource bool
 	send   chan []byte
 }
 
@@ -57,6 +59,8 @@ func NewHub() *Hub {
 
 func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	rangeNum := parseIntQuery(r, "range", 0)
+	audioReceiver := r.URL.Query().Get("audio") == "1"
+	audioSource := r.URL.Query().Get("audioSource") == "1"
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
@@ -65,6 +69,8 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 		hub:    h,
 		conn:   conn,
 		filter: rangeNum,
+		audioReceiver: audioReceiver,
+		audioSource: audioSource,
 		send:   make(chan []byte, wsSendQueue),
 	}
 	h.mu.Lock()
@@ -86,9 +92,12 @@ func (c *wsClient) readPump() {
 		return nil
 	})
 	for {
-		if _, _, err := c.conn.ReadMessage(); err != nil {
-			return
-		}
+		_, message, err := c.conn.ReadMessage()
+		if err != nil { return }
+		if !c.audioSource { continue }
+		var event struct { Type string `json:"type"`; File string `json:"file"` }
+		if json.Unmarshal(message, &event) != nil || event.Type != "audio_play" || !validAudioEventFile(event.File) { continue }
+		c.hub.broadcastAudio(event.File)
 	}
 }
 
@@ -184,4 +193,20 @@ func parseIntQuery(r *http.Request, key string, def int) int {
 		return def
 	}
 	return n
+}
+
+
+func validAudioEventFile(file string) bool {
+	if file == "busted.mp3" || file == "next-player.mp3" || file == "bullseye.mp3" || file == "tripple17.mp3" || file == "tripple18.mp3" || file == "tripple19.mp3" || file == "tripple20.mp3" { return true }
+	if !strings.HasSuffix(file, ".mp3") { return false }
+	n, err := strconv.Atoi(strings.TrimSuffix(file, ".mp3"))
+	return err == nil && n >= 1 && n <= 180
+}
+
+func (h *Hub) broadcastAudio(file string) {
+	b, err := json.Marshal(map[string]string{"type":"audio_play", "file":file})
+	if err != nil { return }
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for c := range h.clients { if c.audioReceiver { c.enqueue(b) } }
 }

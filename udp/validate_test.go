@@ -78,6 +78,32 @@ func TestValidateShotRejectsZeroAtCentre(t *testing.T) {
 	}
 }
 
+func TestValidateShotAcceptsFunDartBullseye(t *testing.T) {
+	sp := &state.ShotPayload{
+		X:           0,
+		Y:           0,
+		Distance:    0,
+		FullValue:   50,
+		DecValue:    50.0,
+		DiscTypeRaw: "fun_dart",
+	}
+	if err := ValidateShot(sp); err != nil {
+		t.Fatalf("fun_dart bullseye rejected: %v", err)
+	}
+}
+
+func TestValidateShotStillRejects50OnNormalDisc(t *testing.T) {
+	sp := &state.ShotPayload{
+		X:         0,
+		Y:         0,
+		Distance:  0,
+		FullValue: 50,
+		DecValue:  50.0,
+	}
+	if err := ValidateShot(sp); err == nil {
+		t.Fatal("normal shooting disc must still reject DecValue 50.0")
+	}
+}
 func TestValidateShotAccepts10_9Centre(t *testing.T) {
 	sp := &state.ShotPayload{X: 0, Y: 0, Distance: 0, FullValue: 10, DecValue: 10.9}
 	if err := ValidateShot(sp); err != nil {

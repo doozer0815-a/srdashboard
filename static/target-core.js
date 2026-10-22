@@ -606,6 +606,9 @@ document.addEventListener('keydown', function (ev) {
 
 /** Built-in OpticScore DiscType codes when plugin map has no match. */
 const DISC_TYPE_FALLBACKS = {
+  fun_dart: 'dartboard',
+  dart: 'dartboard',
+  darts: 'dartboard',
   lg: 'air_rifle_10m',
   luftgewehr: 'air_rifle_10m',
   lp: 'air_pistol_10m',

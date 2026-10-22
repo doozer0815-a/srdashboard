@@ -74,6 +74,9 @@ func setScalarText(el *etree.Element, v any) {
 }
 
 func formatScalar(v any) string {
+	if v == nil {
+		return ""
+	}
 	switch x := v.(type) {
 	case bool:
 		if x {

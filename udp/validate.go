@@ -91,6 +91,21 @@ func ValidateShot(sp *state.ShotPayload) error {
 	if sp.X < -coordLimit || sp.X > coordLimit || sp.Y < -coordLimit || sp.Y > coordLimit {
 		return fmt.Errorf("coordinates X=%d Y=%d outside ±%d", sp.X, sp.Y, coordLimit)
 	}
+
+	// fun_dart uses real dart scores (for example 50 for bullseye) instead
+	// of the normal 0.0...10.9 shooting score scale. Keep only the generic
+	// geometry sanity checks for this disc type and skip LG/LP score checks.
+	if strings.TrimSpace(sp.DiscTypeRaw) == "fun_dart" {
+		if sp.Distance < 0 {
+			return fmt.Errorf("Distance %.3f is negative", sp.Distance)
+		}
+		hyp := math.Hypot(float64(sp.X), float64(sp.Y))
+		if math.Abs(hyp-sp.Distance) > distRoundSlack {
+			return fmt.Errorf("Distance %.1f does not match hypot(X,Y)=%.1f (X=%d Y=%d)", sp.Distance, hyp, sp.X, sp.Y)
+		}
+		return nil
+	}
+
 	dec := sp.DecValue
 	if dec < -decRoundSlack || dec > decMax+decRoundSlack {
 		return fmt.Errorf("DecValue %.3f outside 0…%.1f", dec, decMax)

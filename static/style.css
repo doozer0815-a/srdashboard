@@ -2690,3 +2690,10 @@ body.compact-display .range-plugin-view.classic-range-view {
   .range-header-line1 { font-size: 20px; line-height: 24px; }
   .range-header-meta-row { font-size: 12px; line-height: 14px; }
 }
+
+
+
+/* /all: keep the normal hall view, hiding only its menu/header chrome. */
+body.hall-no-menu #top-bar {
+  display: none !important;
+}

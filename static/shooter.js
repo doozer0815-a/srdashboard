@@ -44,7 +44,7 @@
     app.innerHTML =
       '<div class="shooter-shell">' +
       '<div class="shooter-top">' +
-      '<div><div class="shooter-range-label">Range ' + rangeNum + '</div>' +
+      '<div><div class="shooter-range-label">Stand ' + rangeNum + '</div>' +
       '<div class="shooter-phase shooter-name"></div></div>' +
       '<div style="text-align:right">' +
       '<div class="shooter-plugin-label" id="shooter-plugin-label"></div>' +

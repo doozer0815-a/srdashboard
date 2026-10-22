@@ -75,6 +75,7 @@ func (h *Handlers) PluginGet(w http.ResponseWriter, r *http.Request) {
 
 var rangePath = regexp.MustCompile(`^/(\d+)/?$`)
 var compactPath = regexp.MustCompile(`^/compact/?$`)
+var allPath = regexp.MustCompile(`^/all/?$`)
 
 // StaticOptions configures SPA + static file serving for a mux.
 type StaticOptions struct {
@@ -180,7 +181,7 @@ func registerStatic(mux *http.ServeMux, opt StaticOptions) {
 			serveIndex(w, r)
 			return
 		}
-		if rangePath.MatchString(path) || compactPath.MatchString(path) || path == "/" || path == "/index.html" {
+		if rangePath.MatchString(path) || compactPath.MatchString(path) || allPath.MatchString(path) || path == "/" || path == "/index.html" {
 			serveIndex(w, r)
 			return
 		}

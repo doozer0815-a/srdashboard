@@ -1,0 +1,19 @@
+{
+  "name": "SRDashboard – Live Range",
+  "short_name": "SRDashboard",
+  "description": "Live-Übersicht für Schießstände und Darts",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#17232b",
+  "theme_color": "#17232b",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

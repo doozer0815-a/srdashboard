@@ -12,6 +12,13 @@ func DiffOverrides(defaults, merged map[string]any) map[string]any {
 	out := make(map[string]any)
 	for k, v := range merged {
 		dv, ok := defaults[k]
+		// Persist boolean values explicitly, including false. This avoids a
+		// disabled checkbox disappearing from config.xml and being restored
+		// as enabled when the editor is reopened.
+		if _, isBool := v.(bool); isBool {
+			out[k] = v
+			continue
+		}
 		if !ok || !valuesEqual(dv, v) {
 			out[k] = v
 		}

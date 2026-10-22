@@ -3,6 +3,7 @@ package rangestate
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -324,6 +325,17 @@ func (m *Manager) OnShot(rangeNum int, shot state.Shot, shotIndex int) {
 	shared := m.sharedMode
 	m.mu.Unlock()
 
+	// Enforce the target contract before any plugin callback or ShotCount update.
+	// Darts accepts exactly DiscTypeRaw == "fun_dart"; it must not count LG/LP/KK
+	// or any other target. Every other plugin rejects all fun_* targets.
+	if strings.EqualFold(strings.TrimSpace(pluginID), "darts") {
+		if strings.TrimSpace(shot.DiscTypeRaw) != "fun_dart" {
+			return
+		}
+	} else if isFunTargetShot(shot) {
+		return
+	}
+
 	ap, err := m.plugins.Get(pluginID)
 	if err != nil {
 		return
@@ -404,6 +416,17 @@ func (m *Manager) OnShot(rangeNum int, shot state.Shot, shotIndex int) {
 		return
 	}
 	s.ViewModel = m.displayViewModelLocked(rangeNum, ap)
+}
+
+// normalizedDiscType normalizes the raw OpticScore disc type without guessing
+// from score values or geometry. DiscTypeRaw is the authoritative ID.
+func normalizedDiscType(shot state.Shot) string {
+	discType := strings.ToLower(strings.TrimSpace(shot.DiscTypeRaw))
+	return strings.NewReplacer("-", "_", " ", "_").Replace(discType)
+}
+
+func isFunTargetShot(shot state.Shot) bool {
+	return strings.HasPrefix(normalizedDiscType(shot), "fun_")
 }
 
 func (m *Manager) sessionStateLocked(s *RangePluginSession) logicapi.SessionState {

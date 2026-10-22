@@ -3,7 +3,7 @@
     const params = new URLSearchParams(location.search);
     const qDisplay = params.get('display');
     const qRange = params.get('range');
-    if (qDisplay === 'shooter' || qDisplay === 'master' || qDisplay === 'config' || qDisplay === 'compact') {
+    if (qDisplay === 'shooter' || qDisplay === 'master' || qDisplay === 'config' || qDisplay === 'compact' || qDisplay === 'all') {
       return {
         display: qDisplay,
         rangeNum: qDisplay === 'shooter' ? (parseInt(qRange, 10) || 1) : null
@@ -14,6 +14,9 @@
     }
     if (/^\/compact\/?$/.test(location.pathname)) {
       return { display: 'compact', rangeNum: null };
+    }
+    if (/^\/all\/?$/.test(location.pathname)) {
+      return { display: 'master', rangeNum: null, noMenu: true };
     }
     const m = location.pathname.match(/^\/(\d+)\/?$/);
     if (m) {
@@ -179,6 +182,7 @@
       if (config) config.hidden = true;
       if (chrome) chrome.hidden = false;
       if (display === 'compact') document.body.classList.add('compact-display');
+      if (resolved.noMenu) document.body.classList.add('hall-no-menu');
     }
   });
 })();
