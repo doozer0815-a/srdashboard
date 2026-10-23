@@ -75,47 +75,44 @@ window.SRPluginViews = window.SRPluginViews || {};
   loadAudioSettings();
 
   function audioFileForSpecialDart(ev) {
-    if (
-      !ev ||
-      ev.type !== 'dart' ||
-      !ev.data
-    ) {
-      return null;
-    }
+    if (!ev || ev.type !== 'dart') return null;
 
-    // In Standard Cricket keine Triple-/Bull-Sondertöne ausgeben,
-    // wenn das getroffene Ziel bereits geschlossen war.
-    // cricketMarks enthält hier die Anzahl der neu gewerteten Treffer;
-    // 0 bei einem gültigen Cricket-Ziel bedeutet: Ziel war bereits zu.
-    if (
-      ev.data.cricketTarget &&
-      Number(ev.data.cricketMarks) === 0
-    ) {
-      return null;
-    }
+    // Eingabegeräte und Spielmodi liefern die Trefferangaben teils in
+    // leicht unterschiedlichen Formen. Deshalb alle relevanten Felder
+    // normalisieren und Single Bull vor Cricket-Sonderregeln erkennen.
+    const data = ev.data || {};
+    const notation = String(data.notation || ev.notation || '')
+      .trim().toUpperCase().replace(/[\s_-]+/g, '');
+    const ring = String(data.ring || ev.ring || '')
+      .trim().toLowerCase().replace(/[\s_-]+/g, '');
+    const score = Number(data.score ?? ev.score);
+    const value = Number(data.value ?? ev.value);
+    const multiplier = Number(data.multiplier ?? ev.multiplier);
 
-    const notation = String(
-      ev.data.notation || ''
-    ).toUpperCase();
+    // Äußerer Bull (25), unabhängig vom Spielmodus.
+    // BULL / bullseye hat Vorrang als innerer Bull und darf nicht als Single zählen.
+    const isInnerBull = ring === 'bullseye' || notation === 'BULL' || notation === 'INNERBULL';
+    const isOuterBull = !isInnerBull && (
+      ring === 'outerbull' ||
+      ring === 'singlebull' ||
+      ring === 'sbull' ||
+      ['25', 'S25', 'SB', 'SINGLEBULL', 'OUTERBULL', 'SBULL'].includes(notation) ||
+      (score === 25 && multiplier !== 2) ||
+      (value === 25 && multiplier === 1)
+    );
+    if (isOuterBull) return 'bull.mp3';
+
+    // In Cricket keine Sondertöne für Treffer ausgeben, die kein neues Ziel markieren.
+    if (data.cricketTarget && Number(data.cricketMarks) === 0) return null;
 
     switch (notation) {
-      case 'T20':
-        return 'tripple20.mp3';
-
-      case 'T19':
-        return 'tripple19.mp3';
-
-      case 'T18':
-        return 'tripple18.mp3';
-
-      case 'T17':
-        return 'tripple17.mp3';
-
-      case 'BULL':
-        return 'bullseye.mp3';
-
-      default:
-        return null;
+      case 'T20': return 'tripple20.mp3';
+      case 'T19': return 'tripple19.mp3';
+      case 'T18': return 'tripple18.mp3';
+      case 'T17': return 'tripple17.mp3';
+      case 'T16': return 'tripple16.mp3';
+      case 'BULL': return 'bullseye.mp3';
+      default: return null;
     }
   }
 
@@ -126,6 +123,15 @@ window.SRPluginViews = window.SRPluginViews || {};
 
   function queueAudioFile(file) {
     if (!file) return;
+    if (file === 'bull.mp3') {
+      console.info('[darts] Bull-Audio: queueAudioFile aufgerufen', {
+        audioEnabled: audioEnabled,
+        audioUnlocked: audioUnlocked,
+        audioPlaying: audioPlaying,
+        queueLength: audioQueue.length,
+        relayRole: audioRelayRole
+      });
+    }
     // Nur die Eingabe-/Bahnansicht sendet Audioereignisse an den Server.
     // Empfänger spielen die Ereignisse lokal ab, wenn audio=1 gesetzt ist.
     if (audioRelayRole === 'source') relayAudioFile(file);
@@ -167,7 +173,7 @@ window.SRPluginViews = window.SRPluginViews || {};
   }
 
   function queueRemoteAudioFile(file) {
-    if (!audioEnabled || !/^(busted|next-player|bullseye|tripple17|tripple18|tripple19|tripple20|[1-9]?[0-9]|1[0-7][0-9]|180)\.mp3$/.test(file)) return;
+    if (!audioEnabled || !/^(busted|next-player|bullseye|bull|tripple16|tripple17|tripple18|tripple19|tripple20|[1-9]?[0-9]|1[0-7][0-9]|180)\.mp3$/.test(file)) return;
     audioQueue.push(file);
     playNextAudio();
   }
@@ -232,6 +238,13 @@ window.SRPluginViews = window.SRPluginViews || {};
 
     const file = audioQueue.shift();
 
+    if (file === 'bull.mp3') {
+      console.info('[darts] Bull-Audio: Wiedergabe wird gestartet', {
+        url: AUDIO_BASE + encodeURIComponent(file),
+        volume: audioVolume
+      });
+    }
+
     const audio = new Audio(
       AUDIO_BASE +
       encodeURIComponent(file)
@@ -268,7 +281,42 @@ window.SRPluginViews = window.SRPluginViews || {};
       { once: true }
     );
 
+    if (file === 'bull.mp3') {
+      audio.addEventListener('playing', function () {
+        console.info('[darts] Bull-Audio: playing-Event', {
+          currentSrc: audio.currentSrc,
+          volume: audio.volume,
+          muted: audio.muted,
+          currentTime: audio.currentTime
+        });
+      }, { once: true });
+      audio.addEventListener('loadeddata', function () {
+        console.info('[darts] Bull-Audio: loadeddata', {
+          readyState: audio.readyState,
+          duration: audio.duration
+        });
+      }, { once: true });
+      audio.addEventListener('ended', function () {
+        console.info('[darts] Bull-Audio: ended');
+      }, { once: true });
+      audio.addEventListener('error', function () {
+        console.error('[darts] Bull-Audio: media error', {
+          code: audio.error && audio.error.code,
+          message: audio.error && audio.error.message,
+          currentSrc: audio.currentSrc
+        });
+      }, { once: true });
+    }
+
     const promise = audio.play();
+
+    if (file === 'bull.mp3' && promise && typeof promise.then === 'function') {
+      promise.then(function () {
+        console.info('[darts] Bull-Audio: play-Promise resolved');
+      }).catch(function (err) {
+        console.error('[darts] Bull-Audio: play-Promise rejected', err);
+      });
+    }
 
     if (
       promise &&
@@ -300,6 +348,7 @@ window.SRPluginViews = window.SRPluginViews || {};
 
     audio.muted = true;
     audio.volume = 0;
+
 
     const promise = audio.play();
 
@@ -341,7 +390,10 @@ window.SRPluginViews = window.SRPluginViews || {};
     ) + '.mp3';
   }
 
-  function handleDartAudioEvents(events, canAdvanceTurn) {
+  let lastTurnEndAudioSignature = null;
+  let turnEndAudioHandled = false;
+
+  function handleDartAudioEvents(events, canAdvanceTurn, gameMode) {
     const list = Array.isArray(events) ? events : [];
     if (!list.length) {
       // Merke den leeren Zustand, damit eine spätere neue Partie wieder
@@ -377,22 +429,65 @@ window.SRPluginViews = window.SRPluginViews || {};
         return;
       }
 
+      if (ev.type === 'dart') {
+        turnEndAudioHandled = false;
+        lastTurnEndAudioSignature = null;
+      }
+
+      // Around the Clock: Nur wertende Treffer ansagen.
+      // Die Spiellogik setzt data.clockHit auf true, wenn das aktuelle
+      // Ziel getroffen wurde. Fehlwürfe/falsche Zahlen bleiben stumm.
+      if (ev.type === 'dart' && gameMode === 'around_clock') {
+        const dartData = ev.data || {};
+        if (dartData.clockHit === true) {
+          queueAudioFile('good-single.mp3');
+        }
+        return;
+      }
+
       // T17/T18/T19/T20/Bullseye
       // direkt nach dem Dart.
       if (ev.type === 'dart') {
-        const special =
-          audioFileForSpecialDart(ev);
+        const special = audioFileForSpecialDart(ev);
+        const dartData = ev.data || {};
+        const rawNotation = String(dartData.notation || ev.notation || '').trim();
+        const rawRing = String(dartData.ring || ev.ring || '').trim();
+        const rawScore = dartData.score ?? ev.score;
 
-        if (special) {
-          queueAudioFile(special);
+        // Temporary targeted diagnostics: show the actual outer-bull event
+        // received by the browser and which audio file is selected.
+        if (/bull|^25$|^s25$/i.test(rawNotation) || /bull/i.test(rawRing) || Number(rawScore) === 25) {
+          console.info('[darts] Bull-Audio-Diagnose', {
+            notation: rawNotation,
+            ring: rawRing,
+            score: rawScore,
+            selectedAudio: special,
+            event: ev
+          });
         }
 
+        if (special) queueAudioFile(special);
         return;
       }
 
       // Normales Ende einer Aufnahme:
       // Rundensumme, danach Spielerwechsel.
       if (ev.type === 'turn_end') {
+        // Ein turn_end kann nach einem State-/Event-Reset erneut im Snapshot
+        // auftauchen. In diesem Fall die Spielerwechsel-Audio nicht doppelt
+        // einreihen. Ein neuer Dart setzt die Sperre wieder zurück.
+        let turnEndSignature;
+        try {
+          turnEndSignature = JSON.stringify(ev);
+        } catch (_) {
+          turnEndSignature = String(ev.type);
+        }
+        if (turnEndAudioHandled && turnEndSignature === lastTurnEndAudioSignature) {
+          return;
+        }
+        turnEndAudioHandled = true;
+        lastTurnEndAudioSignature = turnEndSignature;
+
         // Bei Bust keine Rundensumme ansagen, sondern busted.mp3.
         const busted = !!(
           ev.data &&
@@ -702,6 +797,7 @@ window.SRPluginViews = window.SRPluginViews || {};
       '<select data-game-mode' + (settingsLocked ? ' disabled' : '') + '>' +
       '<option value="x01"' + ((game.gameMode || 'x01') === 'x01' ? ' selected' : '') + '>301 / 501 / 701</option>' +
       '<option value="cricket"' + (game.gameMode === 'cricket' ? ' selected' : '') + '>Standard Cricket</option>' +
+      '<option value="around_clock"' + (game.gameMode === 'around_clock' ? ' selected' : '') + '>Around the Clock</option>' +
       '</select>' +
       '</label>' +
 
@@ -1027,7 +1123,7 @@ window.SRPluginViews = window.SRPluginViews || {};
             : '';
 
         return (
-          '<div class="dt-player ' + (game.gameMode === 'cricket' ? 'dt-player-cricket ' : '') +
+          '<div class="dt-player ' + (game.gameMode === 'cricket' ? 'dt-player-cricket ' : (game.gameMode === 'around_clock' ? 'dt-player-clock ' : '')) +
 
           (
             active
@@ -1085,7 +1181,7 @@ window.SRPluginViews = window.SRPluginViews || {};
 
           '<div class="dt-score">' +
 
-          esc(game.gameMode === 'cricket' ? (p.cricketPoints || 0) : p.score) +
+          esc(game.gameMode === 'cricket' ? (p.cricketPoints || 0) : (game.gameMode === 'around_clock' ? ((p.clockTarget || 1) <= 20 ? 'Ziel ' + (p.clockTarget || 1) : ((p.clockTarget || 1) === 21 ? 'Bull' : 'Fertig')) : p.score)) +
 
           '</div>' +
           (game.gameMode === 'cricket' ? '<div class="dt-stat dt-open"><strong>' + esc(p.openDarts) + '</strong></div>' : '') +
@@ -1224,8 +1320,8 @@ window.SRPluginViews = window.SRPluginViews || {};
 
       (
         game.phase === 'playing' || game.phase === 'finished'
-          ? (game.gameMode === 'cricket' ? 'Dart Cricket' : 'Dart ' + esc(game.startingScore || 501))
-          : (game.gameMode === 'cricket' ? 'Dart Cricket' : 'Dart')
+          ? (game.gameMode === 'cricket' ? 'Dart Cricket' : (game.gameMode === 'around_clock' ? 'Around the Clock' : 'Dart ' + esc(game.startingScore || 501)))
+          : (game.gameMode === 'cricket' ? 'Dart Cricket' : (game.gameMode === 'around_clock' ? 'Around the Clock' : 'Dart'))
       ) +
 
       '</span>' +
@@ -1242,14 +1338,14 @@ window.SRPluginViews = window.SRPluginViews || {};
 
       '</span>' +
 
-      (game.gameMode === 'cricket' ? '<span>Standard Cricket</span>' :
+      (game.gameMode === 'cricket' ? '<span>Standard Cricket</span>' : (game.gameMode === 'around_clock' ? '<span>1–20 + Bull</span>' :
         (game.doubleIn && game.doubleOut
           ? '<span>Double-In / Double-Out</span>'
           : game.doubleIn
             ? '<span>Double-In</span>'
             : game.doubleOut
               ? '<span>Double-Out</span>'
-              : '')) +
+              : ''))) +
 
       (
         focus
@@ -1347,12 +1443,12 @@ window.SRPluginViews = window.SRPluginViews || {};
 
     // Die Spieler-Kopfzeile muss bei jedem Rendern zum aktuellen Spielmodus passen.
     // Neben dem internen Modus 'x01' werden auch direkte Variantenbezeichnungen akzeptiert.
-    const isX01 = game.gameMode !== 'cricket' && /^(x01|301|501|701)?$/i.test(String(game.gameMode || 'x01'));
+    const isX01 = game.gameMode !== 'cricket' && game.gameMode !== 'around_clock' && /^(x01|301|501|701)?$/i.test(String(game.gameMode || 'x01'));
 
     players.innerHTML =
       (isX01
         ? '<div class="dt-player-head" aria-hidden="true"><span class="dt-player-head-title">Spieler</span><span>Gesamt</span><span>Runde</span><span>Offen</span></div>'
-        : (game.gameMode === 'cricket' ? '<div class="dt-player-head dt-player-head-cricket" aria-hidden="true"><span class="dt-player-head-title">Spieler</span><span>Punkte</span><span>Offen</span></div>' : '<h3>Spieler</h3>')) +
+        : (game.gameMode === 'cricket' ? '<div class="dt-player-head dt-player-head-cricket" aria-hidden="true"><span class="dt-player-head-title">Spieler</span><span>Punkte</span><span>Offen</span></div>' : (game.gameMode === 'around_clock' ? '<div class="dt-player-head" aria-hidden="true"><span class="dt-player-head-title">Spieler</span><span>Nächstes Ziel</span></div>' : '<h3>Spieler</h3>'))) +
       '<div class="dt-players">' +
       playersHtml(game, vm.inactiveRanges) +
       '</div>';
@@ -1439,9 +1535,12 @@ window.SRPluginViews = window.SRPluginViews || {};
     ) {
       const gameModeSelect = controls.querySelector('[data-game-mode]');
       function updateCricketSettingsVisibility() {
-        const cricket = !!(gameModeSelect && gameModeSelect.value === 'cricket');
+        // Startscore, Double In und Double Out gelten nur für X01.
+        // Bei Cricket und Around the Clock werden diese Felder ausgeblendet.
+        const mode = gameModeSelect && gameModeSelect.value;
+        const hideX01Settings = mode !== 'x01' && mode !== '301' && mode !== '501' && mode !== '701';
         controls.querySelectorAll('[data-x01-setting]').forEach(function (el) {
-          el.hidden = cricket;
+          el.hidden = !!hideX01Settings;
         });
       }
       if (gameModeSelect) {
@@ -1463,7 +1562,7 @@ window.SRPluginViews = window.SRPluginViews || {};
             playerList.innerHTML =
               (isX01Mode
                 ? '<div class="dt-player-head" aria-hidden="true"><span class="dt-player-head-title">Spieler</span><span>Gesamt</span><span>Runde</span><span>Offen</span></div>'
-                : (game.gameMode === 'cricket' ? '<div class="dt-player-head dt-player-head-cricket" aria-hidden="true"><span class="dt-player-head-title">Spieler</span><span>Punkte</span><span>Offen</span></div>' : '<h3>Spieler</h3>')) +
+                : (game.gameMode === 'cricket' ? '<div class="dt-player-head dt-player-head-cricket" aria-hidden="true"><span class="dt-player-head-title">Spieler</span><span>Punkte</span><span>Offen</span></div>' : (game.gameMode === 'around_clock' ? '<div class="dt-player-head" aria-hidden="true"><span class="dt-player-head-title">Spieler</span><span>Nächstes Ziel</span></div>' : '<h3>Spieler</h3>'))) +
               '<div class="dt-players">' +
               playersHtml(selectedGame, vm.inactiveRanges) +
               '</div>';
@@ -1622,7 +1721,8 @@ window.SRPluginViews = window.SRPluginViews || {};
     // Audio-Ereignisse verarbeiten.
     handleDartAudioEvents(
       vm.events || [],
-      canControl
+      canControl,
+      game.gameMode || 'x01'
     );
 
     // Erst die Rundensumme aus dem Checkout-Ereignis einreihen,

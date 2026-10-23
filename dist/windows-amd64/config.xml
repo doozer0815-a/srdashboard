@@ -4,8 +4,8 @@
   <!-- Raw OpticScore resend to another dashboard: host:port or a bare port (127.0.0.1). Empty = off. -->
   <udpForward/>
   <odbcName>SRDashboard_Access_DSN</odbcName>
-  <ranges>6</ranges>
-  <layoutColumns>3</layoutColumns>
+  <ranges>8</ranges>
+  <layoutColumns>4</layoutColumns>
   <footer>
     <currentShotValue>true</currentShotValue>
     <teiler>true</teiler>

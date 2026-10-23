@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugin id="darts" label="Dart" version="1.0.0" mode="shared" kind="game">
-  <description>301, 501, 701 oder Standard Cricket; X01 mit optional Double In und Double Out. Nur DISAG-Schüsse der Scheibe fun_dart werden verarbeitet.</description>
+  <description>301, 501, 701, Standard Cricket oder Around the Clock; X01 mit optional Double In und Double Out. Nur DISAG-Schüsse der Scheibe fun_dart werden verarbeitet.</description>
   <entrypoints view="view.js" theme="theme.css" logic="builtin"/>
   <config>
     <gameMode>x01</gameMode>

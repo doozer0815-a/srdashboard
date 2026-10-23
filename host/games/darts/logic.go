@@ -67,7 +67,7 @@ func (l *Logic) ConfigSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"gameMode":              map[string]any{"type": "string", "enum": []string{"x01", "cricket"}, "title": "Spielart"},
+			"gameMode":              map[string]any{"type": "string", "enum": []string{"x01", "cricket", "around_clock"}, "title": "Spielart"},
 			"startingScore":         map[string]any{"type": "integer", "enum": []int{301, 501, 701}, "title": "Start-Spiel"},
 			"doubleIn":              map[string]any{"type": "boolean", "title": "Double-In"},
 			"doubleOut":             map[string]any{"type": "boolean", "title": "Double-Out"},
@@ -86,6 +86,7 @@ type Player struct {
 	Score           int            `json:"score"`
 	CricketMarks    map[string]int `json:"cricketMarks,omitempty"`
 	CricketPoints   int            `json:"cricketPoints,omitempty"`
+	ClockTarget     int            `json:"clockTarget"`
 	Started         bool           `json:"started"`
 	Finished        bool           `json:"finished"`
 	RoundStartScore int            `json:"roundStartScore"`
@@ -212,6 +213,36 @@ func (l *Logic) OnShotCtx(sess logicapi.SessionState, ctx logicapi.ShotContext) 
 		gs.RecentDarts = gs.RecentDarts[len(gs.RecentDarts)-30:]
 	}
 
+	if gs.GameMode == "around_clock" {
+		target := p.ClockTarget
+		hitValue := 0
+		if dart.Ring == "bullseye" || dart.Ring == "outer-bull" {
+			hitValue = 21
+		} else if dart.Multiplier > 0 {
+			hitValue = dart.Value / dart.Multiplier
+		}
+		hit := (target <= 20 && hitValue == target && dart.Ring != "miss") || (target == 21 && hitValue == 21)
+		if hit {
+			p.ClockTarget++
+		}
+		events := []logicapi.PluginEvent{{Type: "dart", Data: map[string]any{"rangeNum": ctx.RangeNum, "index": dart.Index, "notation": dart.Notation, "score": 0, "ring": dart.Ring, "remaining": p.ClockTarget, "clockTarget": target, "clockHit": hit}}}
+		if p.ClockTarget > 21 {
+			p.OpenDarts = 0
+			p.Finished = true
+			gs.WinnerRange = p.RangeNum
+			gs.Phase = gameutil.PhaseFinished
+			gs.StatusLine = fmt.Sprintf("%s gewinnt Around the Clock!", playerLabel(p))
+			events = append(events, logicapi.PluginEvent{Type: "checkout", Data: map[string]any{"rangeNum": p.RangeNum}}, logicapi.PluginEvent{Type: "match_finished", Data: map[string]any{"winnerRange": p.RangeNum}})
+			return marshalWithEvents(gs, events)
+		}
+		if len(p.RoundDarts) >= 3 {
+			p.LastResult = "Runde"
+			return gs.finishTurn(events)
+		}
+		gs.StatusLine = fmt.Sprintf("%s: %s · Ziel %s", playerLabel(p), dart.Notation, clockTargetLabel(p.ClockTarget))
+		return marshalWithEvents(gs, events)
+	}
+
 	if gs.GameMode == "cricket" {
 		var events []logicapi.PluginEvent
 		points, targetKey, marks := applyCricketDart(gs, p, dart)
@@ -328,7 +359,7 @@ func (l *Logic) Control(sess logicapi.SessionState, action string, params map[st
 
 	switch action {
 	case "set_game_mode":
-		if v, ok := params["gameMode"].(string); ok && (v == "x01" || v == "cricket") {
+		if v, ok := params["gameMode"].(string); ok && (v == "x01" || v == "cricket" || v == "around_clock") {
 			gs.GameMode = v
 			gs.Config["gameMode"] = v
 		}
@@ -394,6 +425,7 @@ func (l *Logic) ViewModel(sess logicapi.SessionState, rangeNum int) (map[string]
 		"game": map[string]any{
 			"phase":              gs.Phase,
 			"gameMode":           gs.GameMode,
+			"clockTargetOrder":   append([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21}, []int{}...),
 			"cricketTargets":     []string{"20", "19", "18", "17", "16", "15", "B"},
 			"statusLine":         gs.StatusLine,
 			"startBlockedReason": gs.StartBlockedReason,
@@ -428,6 +460,7 @@ func playerVM(p *Player, gs *GameState) map[string]any {
 		"score":          p.Score,
 		"cricketMarks":   p.CricketMarks,
 		"cricketPoints":  p.CricketPoints,
+		"clockTarget":    p.ClockTarget,
 		"started":        p.Started,
 		"finished":       p.Finished,
 		"roundScore":     p.RoundScore,
@@ -452,7 +485,7 @@ func recentDartVM(in []DartMark) []map[string]any {
 }
 
 func (gs *GameState) startFromParams(params map[string]any) (logicapi.SessionState, []logicapi.PluginEvent, error) {
-	if v, ok := params["gameMode"].(string); ok && (v == "x01" || v == "cricket") {
+	if v, ok := params["gameMode"].(string); ok && (v == "x01" || v == "cricket" || v == "around_clock") {
 		gs.GameMode = v
 		gs.Config["gameMode"] = v
 	}
@@ -489,10 +522,10 @@ func (gs *GameState) startFromParams(params map[string]any) (logicapi.SessionSta
 	}
 
 	target := gameutil.CfgInt(gs.Config, "startingScore", 501)
-	if gs.GameMode == "cricket" {
+	if gs.GameMode == "cricket" || gs.GameMode == "around_clock" {
 		target = 0
 	}
-	if gs.GameMode != "cricket" && target != 301 && target != 501 && target != 701 {
+	if gs.GameMode != "cricket" && gs.GameMode != "around_clock" && target != 301 && target != 501 && target != 701 {
 		return nil, nil, fmt.Errorf("ungültiger Startwert %d", target)
 	}
 
@@ -509,6 +542,8 @@ func (gs *GameState) startFromParams(params map[string]any) (logicapi.SessionSta
 	gs.BoardDarts = nil
 	if gs.GameMode == "cricket" {
 		gs.StatusLine = fmt.Sprintf("Dart Standard Cricket — %s beginnt", playerLabel(gs.Players[strconv.Itoa(gs.ActiveRange)]))
+	} else if gs.GameMode == "around_clock" {
+		gs.StatusLine = fmt.Sprintf("Around the Clock — %s beginnt (Ziel 1)", playerLabel(gs.Players[strconv.Itoa(gs.ActiveRange)]))
 	} else {
 		gs.StatusLine = fmt.Sprintf("Dart %d — %s beginnt", target, playerLabel(gs.Players[strconv.Itoa(gs.ActiveRange)]))
 	}
@@ -522,6 +557,7 @@ func (gs *GameState) startFromParams(params map[string]any) (logicapi.SessionSta
 		p.Started = !gameutil.CfgBool(gs.Config, "doubleIn", false)
 		p.Score = target
 		p.CricketPoints = 0
+		p.ClockTarget = 1
 		p.CricketMarks = map[string]int{"20": 0, "19": 0, "18": 0, "17": 0, "16": 0, "15": 0, "B": 0}
 		p.RoundStartScore = target
 		p.RoundScore = 0
@@ -668,6 +704,16 @@ func opponentsOpen(gs *GameState, rangeNum int, key string) bool {
 	}
 	return false
 }
+func clockTargetLabel(target int) string {
+	if target == 21 {
+		return "Bullseye"
+	}
+	if target > 21 {
+		return "fertig"
+	}
+	return strconv.Itoa(target)
+}
+
 func cricketValue(key string) int {
 	if key == "B" {
 		return 25
@@ -832,7 +878,7 @@ func (gs *GameState) ensure() {
 	if gs.GameMode == "" {
 		gs.GameMode = gameutil.CfgString(gs.Config, "gameMode", "x01")
 	}
-	if gs.GameMode != "cricket" {
+	if gs.GameMode != "cricket" && gs.GameMode != "around_clock" {
 		gs.GameMode = "x01"
 	}
 	if gs.NumRanges < 1 {

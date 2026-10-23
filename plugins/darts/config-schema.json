@@ -39,7 +39,7 @@
       "type": "string",
       "enum": [
         "x01",
-        "cricket"
+        "cricket", "around_clock"
       ],
       "title": "Spielart"
     }
