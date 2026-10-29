@@ -14,6 +14,13 @@ window.SRPluginViews = window.SRPluginViews || {};
   let audioRelaySocket = null;
   let audioRelayRole = '';
   let audioRelayRange = 0;
+  let dartsAudioActive = false;
+  let audioRelayReconnectTimer = null;
+  let audioRelayGeneration = 0;
+  let activeAudioElement = null;
+  let unlockAudioElement = null;
+  let audioUnlockListenersInstalled = false;
+  let unlockOnceHandler = null;
 
   const AUDIO_SETTINGS_KEY = 'srdashboard.darts.audio';
   let audioEnabled = true;
@@ -72,6 +79,75 @@ window.SRPluginViews = window.SRPluginViews || {};
     runAudioDrainCallbacks();
   }
 
+  // Audio ist ausschließlich aktiv, solange die Ansicht des Plugins 'darts'
+  // tatsächlich gerendert wird. Beim Pluginwechsel werden sämtliche Ressourcen
+  // beendet, nicht nur aus der Warteschlange entfernt.
+  function deactivateDartsAudio() {
+    dartsAudioActive = false;
+    audioRelayGeneration += 1;
+
+    if (audioRelayReconnectTimer !== null) {
+      clearTimeout(audioRelayReconnectTimer);
+      audioRelayReconnectTimer = null;
+    }
+
+    // Drain-Callbacks nicht ausführen: Sie könnten weitere Audioausgaben planen.
+    audioQueue.length = 0;
+    audioDrainCallbacks.length = 0;
+
+    [activeAudioElement, unlockAudioElement].forEach(function (audio) {
+      if (!audio) return;
+      try { audio.pause(); } catch (_) {}
+      try { audio.currentTime = 0; } catch (_) {}
+      try { audio.removeAttribute('src'); audio.load(); } catch (_) {}
+    });
+    activeAudioElement = null;
+    unlockAudioElement = null;
+    audioPlaying = false;
+    audioUnlocked = false;
+
+    if (audioRelaySocket) {
+      const socket = audioRelaySocket;
+      audioRelaySocket = null;
+      try {
+        socket.onopen = null;
+        socket.onmessage = null;
+        socket.onerror = null;
+        socket.onclose = null;
+        if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) socket.close();
+      } catch (_) {}
+    }
+    audioRelayRole = '';
+    removeAudioUnlockPrompt();
+
+    if (audioUnlockListenersInstalled && unlockOnceHandler && typeof document !== 'undefined') {
+      document.removeEventListener('pointerdown', unlockOnceHandler, true);
+      document.removeEventListener('keydown', unlockOnceHandler, true);
+      document.removeEventListener('click', unlockOnceHandler, true);
+    }
+    audioUnlockListenersInstalled = false;
+    unlockOnceHandler = null;
+  }
+
+  function activateDartsAudio() {
+    if (dartsAudioActive) return;
+    dartsAudioActive = true;
+    loadAudioSettings();
+    setupAudioRelay();
+    if (typeof document !== 'undefined') {
+      unlockOnceHandler = function () { unlockAudio(); };
+      document.addEventListener('pointerdown', unlockOnceHandler, true);
+      document.addEventListener('keydown', unlockOnceHandler, true);
+      document.addEventListener('click', unlockOnceHandler, true);
+      audioUnlockListenersInstalled = true;
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', showAudioUnlockPrompt, { once: true });
+      } else {
+        showAudioUnlockPrompt();
+      }
+    }
+  }
+
   loadAudioSettings();
 
   function audioFileForSpecialDart(ev) {
@@ -122,7 +198,7 @@ window.SRPluginViews = window.SRPluginViews || {};
   }
 
   function queueAudioFile(file) {
-    if (!file) return;
+    if (!dartsAudioActive || !file) return;
     if (file === 'bull.mp3') {
       console.info('[darts] Bull-Audio: queueAudioFile aufgerufen', {
         audioEnabled: audioEnabled,
@@ -155,17 +231,26 @@ window.SRPluginViews = window.SRPluginViews || {};
       if (display.rangeNum) qs.set('range', String(display.rangeNum));
       if (audioRelayRole === 'source') qs.set('audioSource', '1');
       else qs.set('audio', '1');
+      const generation = audioRelayGeneration;
       const connect = () => {
+        if (!dartsAudioActive || generation !== audioRelayGeneration) return;
         if (audioRelaySocket && (audioRelaySocket.readyState === WebSocket.OPEN || audioRelaySocket.readyState === WebSocket.CONNECTING)) return;
         audioRelaySocket = new WebSocket(proto + '//' + location.host + '/ws?' + qs.toString());
         audioRelaySocket.onmessage = function (ev) {
-          if (audioRelayRole !== 'receiver' || !audioEnabled) return;
+          if (!dartsAudioActive || generation !== audioRelayGeneration || audioRelayRole !== 'receiver' || !audioEnabled) return;
           try {
             const msg = JSON.parse(ev.data);
             if (msg.type === 'audio_play' && typeof msg.file === 'string') queueRemoteAudioFile(msg.file);
           } catch (_) {}
         };
-        audioRelaySocket.onclose = function () { setTimeout(connect, 2000); };
+        audioRelaySocket.onclose = function () {
+          if (!dartsAudioActive || generation !== audioRelayGeneration) return;
+          if (audioRelayReconnectTimer !== null) clearTimeout(audioRelayReconnectTimer);
+          audioRelayReconnectTimer = setTimeout(function () {
+            audioRelayReconnectTimer = null;
+            connect();
+          }, 2000);
+        };
         audioRelaySocket.onerror = function () { try { audioRelaySocket.close(); } catch (_) {} };
       };
       connect();
@@ -173,12 +258,12 @@ window.SRPluginViews = window.SRPluginViews || {};
   }
 
   function queueRemoteAudioFile(file) {
-    if (!audioEnabled || !/^(busted|next-player|bullseye|bull|tripple16|tripple17|tripple18|tripple19|tripple20|[1-9]?[0-9]|1[0-7][0-9]|180)\.mp3$/.test(file)) return;
+    if (!dartsAudioActive || !audioEnabled || !/^(busted|next-player|bullseye|bull|tripple16|tripple17|tripple18|tripple19|tripple20|[1-9]?[0-9]|1[0-7][0-9]|180)\.mp3$/.test(file)) return;
     audioQueue.push(file);
     playNextAudio();
   }
 
-  setupAudioRelay();
+  // Der Audio-Relay wird erst beim Rendern des aktiven Darts-Plugins gestartet.
 
   // Browser verlangen häufig eine bewusste Benutzerinteraktion, bevor Audio
   // abgespielt werden darf. Für explizite audio=1-Aufrufe zeigen wir deshalb
@@ -191,7 +276,7 @@ window.SRPluginViews = window.SRPluginViews || {};
     audioUnlockPrompt = null;
   }
   function showAudioUnlockPrompt() {
-    if (!document.body || audioUnlockPrompt || !audioEnabled) return;
+    if (!dartsAudioActive || !document.body || audioUnlockPrompt || !audioEnabled) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get('audio') !== '1') return;
     const wrap = document.createElement('div');
@@ -209,21 +294,9 @@ window.SRPluginViews = window.SRPluginViews || {};
     document.body.appendChild(wrap);
     audioUnlockPrompt = wrap;
   }
-  if (typeof document !== 'undefined') {
-    const unlockOnce = function () {
-      unlockAudio();
-    };
-    document.addEventListener('pointerdown', unlockOnce, true);
-    document.addEventListener('keydown', unlockOnce, true);
-    document.addEventListener('click', unlockOnce, true);
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', showAudioUnlockPrompt, { once: true });
-    } else {
-      showAudioUnlockPrompt();
-    }
-  }
 
   function playNextAudio() {
+    if (!dartsAudioActive) return;
     if (!audioEnabled) {
       clearAudioQueue();
       return;
@@ -249,6 +322,8 @@ window.SRPluginViews = window.SRPluginViews || {};
       AUDIO_BASE +
       encodeURIComponent(file)
     );
+    activeAudioElement = audio;
+    const playbackGeneration = audioRelayGeneration;
 
     audio.volume = audioVolume;
     audioPlaying = true;
@@ -258,8 +333,13 @@ window.SRPluginViews = window.SRPluginViews || {};
       // ended/error/play().catch können für dieselbe Instanz mehrfach eintreffen.
       if (settled) return;
       settled = true;
+      if (playbackGeneration !== audioRelayGeneration) {
+        if (activeAudioElement === audio) activeAudioElement = null;
+        return;
+      }
+      if (activeAudioElement === audio) activeAudioElement = null;
       audioPlaying = false;
-      playNextAudio();
+      if (dartsAudioActive) playNextAudio();
     };
 
     audio.addEventListener(
@@ -335,7 +415,7 @@ window.SRPluginViews = window.SRPluginViews || {};
   }
 
   function unlockAudio() {
-    if (audioUnlocked) {
+    if (!dartsAudioActive || audioUnlocked) {
       return;
     }
 
@@ -345,6 +425,8 @@ window.SRPluginViews = window.SRPluginViews || {};
     const audio = new Audio(
       AUDIO_BASE + 'next-player.mp3'
     );
+    unlockAudioElement = audio;
+    const unlockGeneration = audioRelayGeneration;
 
     audio.muted = true;
     audio.volume = 0;
@@ -358,7 +440,12 @@ window.SRPluginViews = window.SRPluginViews || {};
     ) {
       promise
         .then(function () {
+          if (!dartsAudioActive || unlockGeneration !== audioRelayGeneration) {
+            try { audio.pause(); } catch (_) {}
+            return;
+          }
           audio.pause();
+          if (unlockAudioElement === audio) unlockAudioElement = null;
 
           try {
             audio.currentTime = 0;
@@ -369,6 +456,7 @@ window.SRPluginViews = window.SRPluginViews || {};
           playNextAudio();
         })
         .catch(function () {
+          if (unlockAudioElement === audio) unlockAudioElement = null;
           // Die normale Audio-Queue versucht es später erneut.
         });
     }
@@ -1175,6 +1263,14 @@ window.SRPluginViews = window.SRPluginViews || {};
             '<span class="dt-dart-chip">—</span>'
           ) +
 
+          (
+            p.lastResult && p.lastResult !== 'Runde'
+              ? '<span class="' + (resultClass ? resultClass : 'dt-result') + '">' +
+                  esc(p.lastResult === 'Bust' ? 'Busted' : p.lastResult) +
+                '</span>'
+              : ''
+          ) +
+
           '</div>' : '') +
 
           '</div>' +
@@ -1191,7 +1287,7 @@ window.SRPluginViews = window.SRPluginViews || {};
 
           (game.gameMode !== 'cricket' ? '<div class="dt-stat dt-open"><strong>' + esc(p.openDarts) + '</strong></div>' : '') +
 
-          '<div class="dt-stat ' +
+          (game.gameMode === 'cricket' ? '<div class="dt-stat ' +
 
           resultClass +
 
@@ -1201,7 +1297,7 @@ window.SRPluginViews = window.SRPluginViews || {};
             p.lastResult === 'Bust' ? 'Busted' : (p.lastResult || '')
           ) +
 
-          '</div>' +
+          '</div>' : '') +
 
           '</div>'
         );
@@ -1213,6 +1309,7 @@ window.SRPluginViews = window.SRPluginViews || {};
     container,
     viewModel
   ) {
+    activateDartsAudio();
     container.classList.add(
       'darts-view'
     );
@@ -1284,6 +1381,124 @@ window.SRPluginViews = window.SRPluginViews || {};
         'data-footer></footer>' +
 
         '</div>';
+    }
+
+
+    // Responsive Layout mit stabilem Umschaltpunkt.
+    // Die Entscheidung basiert auf der Breite des Plugin-Containers und der
+    // verfügbaren Höhe des Hauptbereichs. Eine Hysterese verhindert Flackern
+    // durch Rundungsdifferenzen und ResizeObserver-Rückkopplungen.
+    const responsiveLayout = container.querySelector('.dt-layout');
+    if (responsiveLayout && !responsiveLayout._dtFrameLayoutObserver &&
+        typeof ResizeObserver !== 'undefined') {
+      let stackedState = responsiveLayout.classList.contains('dt-stacked');
+      let layoutFramePending = false;
+
+      const updateFrameLayout = function () {
+        if (layoutFramePending) return;
+        layoutFramePending = true;
+        requestAnimationFrame(function () {
+          layoutFramePending = false;
+          const main = responsiveLayout.querySelector('.dt-main');
+          const boardFrame = responsiveLayout.querySelector('.dt-board-col');
+          if (!main || !boardFrame) return;
+
+          const layoutStyle = getComputedStyle(responsiveLayout);
+          const cssMinWidth = parseFloat(layoutStyle.getPropertyValue('--dt-player-min-width'));
+          const minPlayerWidth = Number.isFinite(cssMinWidth) && cssMinWidth > 0 ? cssMinWidth : 500;
+          const mainStyle = getComputedStyle(main);
+          const paddingX = (parseFloat(mainStyle.paddingLeft) || 0) +
+            (parseFloat(mainStyle.paddingRight) || 0);
+          const paddingY = (parseFloat(mainStyle.paddingTop) || 0) +
+            (parseFloat(mainStyle.paddingBottom) || 0);
+          const gap = parseFloat(mainStyle.columnGap) || 0;
+
+          // Hauptbereich-Höhe ist die Soll-Kantenlänge der quadratischen
+          // Board-Spalte; sie bleibt unabhängig vom aktiven Grid-Modus.
+          const squareSize = Math.max(0, main.clientHeight - paddingY);
+          const availableWidth = Math.max(0, main.clientWidth - paddingX);
+          const requiredWidth = squareSize + minPlayerWidth + gap;
+          const hysteresis = 16;
+
+          // Beim Wechsel in die gestapelte Ansicht gilt die echte Grenze.
+          // Zurück in die Zweispaltenansicht erst mit 16 px zusätzlichem Platz.
+          const shouldStack = stackedState
+            ? availableWidth < requiredWidth + hysteresis
+            : availableWidth < requiredWidth;
+
+          if (shouldStack !== stackedState) {
+            stackedState = shouldStack;
+            responsiveLayout.classList.toggle('dt-stacked', stackedState);
+          }
+
+          if (!stackedState) {
+            const sideWidth = Math.max(minPlayerWidth, availableWidth - squareSize - gap);
+            const nextColumns = 'minmax(0, ' + squareSize + 'px) minmax(' +
+              minPlayerWidth + 'px, ' + sideWidth + 'px)';
+            if (main.style.gridTemplateColumns !== nextColumns) {
+              main.style.gridTemplateColumns = nextColumns;
+            }
+            if (main.style.gridTemplateRows) main.style.removeProperty('grid-template-rows');
+            if (boardFrame.style.width !== squareSize + 'px') boardFrame.style.width = squareSize + 'px';
+            if (boardFrame.style.height !== '100%') boardFrame.style.height = '100%';
+          } else {
+            if (main.style.gridTemplateColumns) main.style.removeProperty('grid-template-columns');
+            if (main.style.gridTemplateRows) main.style.removeProperty('grid-template-rows');
+            if (boardFrame.style.width) boardFrame.style.removeProperty('width');
+            if (boardFrame.style.height) boardFrame.style.removeProperty('height');
+          }
+        });
+      };
+
+      responsiveLayout._dtFrameLayoutObserver = new ResizeObserver(updateFrameLayout);
+      // Nur den stabilen äußeren Plugin-Container beobachten, nicht .dt-main:
+      // dessen Abmessungen ändern sich durch die Umschaltung selbst.
+      responsiveLayout._dtFrameLayoutObserver.observe(responsiveLayout);
+      updateFrameLayout();
+
+      // Spielerdaten dynamisch skalieren. Nur den stabilen Seitencontainer
+      // beobachten: Die Liste selbst ändert ihre Geometrie durch die Skalierung
+      // und darf daher keinen ResizeObserver-Rückkopplungseffekt auslösen.
+      const side = responsiveLayout.querySelector('.dt-side');
+      if (side && !side._dtPlayerFitObserver) {
+        const fitPlayerData = function () {
+          const playerPanel = side.querySelector('[data-players]');
+          const list = playerPanel && playerPanel.querySelector('.dt-players');
+          if (!playerPanel || !list) return;
+          const rows = Array.from(list.querySelectorAll('.dt-player'));
+          if (!rows.length) return;
+
+          // clientHeight der Liste ist bereits die nach Header, Spielsteuerung
+          // und Verlauf verbleibende Höhe. Deshalb nichts davon erneut abziehen.
+          const listHeight = list.clientHeight;
+          const style = getComputedStyle(list);
+          const gap = parseFloat(style.rowGap || style.gap) || 0;
+          const available = Math.max(0, listHeight - gap * Math.max(0, rows.length - 1));
+          const perRow = available / rows.length;
+          const cricket = rows.some(row => row.classList.contains('dt-player-cricket'));
+          const baseHeight = cricket ? 82 : 72;
+          const scale = Math.max(0.3, Math.min(1.5, perRow / baseHeight));
+          const nextScale = scale.toFixed(3);
+          if (side.style.getPropertyValue('--dt-player-scale') !== nextScale) {
+            side.style.setProperty('--dt-player-scale', nextScale);
+          }
+          side.style.setProperty('--dt-player-row-height', baseHeight + 'px');
+        };
+        side._dtFitPlayerData = fitPlayerData;
+        if (typeof ResizeObserver === 'function') {
+          side._dtPlayerFitObserver = new ResizeObserver(function () {
+            if (side._dtFitPlayerDataFrame) cancelAnimationFrame(side._dtFitPlayerDataFrame);
+            side._dtFitPlayerDataFrame = requestAnimationFrame(function () {
+              side._dtFitPlayerDataFrame = 0;
+              fitPlayerData();
+            });
+          });
+          side._dtPlayerFitObserver.observe(side);
+        }
+        // Initialer Lauf und Größenänderungen der äußeren Seite.
+        requestAnimationFrame(fitPlayerData);
+      }
+
     }
 
     const active =
@@ -1447,11 +1662,16 @@ window.SRPluginViews = window.SRPluginViews || {};
 
     players.innerHTML =
       (isX01
-        ? '<div class="dt-player-head" aria-hidden="true"><span class="dt-player-head-title">Spieler</span><span>Gesamt</span><span>Runde</span><span>Offen</span></div>'
+        ? '<div class="dt-player-head" aria-hidden="true"><span class="dt-player-head-title">Spieler</span><span>Gesamt</span><span>Aktuell</span><span>Offen</span></div>'
         : (game.gameMode === 'cricket' ? '<div class="dt-player-head dt-player-head-cricket" aria-hidden="true"><span class="dt-player-head-title">Spieler</span><span>Punkte</span><span>Offen</span></div>' : (game.gameMode === 'around_clock' ? '<div class="dt-player-head" aria-hidden="true"><span class="dt-player-head-title">Spieler</span><span>Nächstes Ziel</span></div>' : '<h3>Spieler</h3>'))) +
       '<div class="dt-players">' +
       playersHtml(game, vm.inactiveRanges) +
       '</div>';
+
+    const playerFitSide = container.querySelector('.dt-side');
+    if (playerFitSide && playerFitSide._dtFitPlayerData) {
+      requestAnimationFrame(playerFitSide._dtFitPlayerData);
+    }
 
     const recent =
       (
@@ -1511,16 +1731,30 @@ window.SRPluginViews = window.SRPluginViews || {};
       )
       .innerHTML =
 
-        '<span>' +
+        'Nur DiscTypeRaw = fun_dart wird verarbeitet · Distance in 1/100 mm · Trefferposition aus X/Y';
 
-        'Nur DiscTypeRaw = fun_dart ' +
-        'wird verarbeitet · ' +
+    // Live-Breiten in der Fußzeile aktualisieren.
+    const metricsEl = container.querySelector('.dt-layout-metrics');
+    const metricsLayout = container.querySelector('.dt-layout');
+    if (metricsEl && metricsLayout && !metricsLayout._dtLayoutMetricsObserver &&
+        typeof ResizeObserver !== 'undefined') {
+      const updateLayoutMetrics = function () {
+        const board = metricsLayout.querySelector('.dt-board-wrap');
+        const players = metricsLayout.querySelector('.dt-side, .dt-players, [data-players]');
+        metricsEl.textContent =
+          'Plugin: ' + Math.round(metricsLayout.getBoundingClientRect().width) + ' px · ' +
+          'Dartscheibe: ' + Math.round(board ? board.getBoundingClientRect().width : 0) + ' px · ' +
+          'Spielerdaten: ' + Math.round(players ? players.getBoundingClientRect().width : 0) + ' px';
+      };
+      metricsLayout._dtLayoutMetricsObserver = new ResizeObserver(updateLayoutMetrics);
+      metricsLayout._dtLayoutMetricsObserver.observe(metricsLayout);
+      const board = metricsLayout.querySelector('.dt-board-wrap');
+      const players = metricsLayout.querySelector('.dt-side, .dt-players, [data-players]');
+      if (board) metricsLayout._dtLayoutMetricsObserver.observe(board);
+      if (players) metricsLayout._dtLayoutMetricsObserver.observe(players);
+      updateLayoutMetrics();
+    }
 
-        'Distance in 1/100 mm · ' +
-
-        'Trefferposition aus X/Y' +
-
-        '</span>';
 
     const controls =
       container.querySelector(
@@ -1561,11 +1795,14 @@ window.SRPluginViews = window.SRPluginViews || {};
             const isX01Mode = /^(x01|301|501|701)$/i.test(String(selectedMode));
             playerList.innerHTML =
               (isX01Mode
-                ? '<div class="dt-player-head" aria-hidden="true"><span class="dt-player-head-title">Spieler</span><span>Gesamt</span><span>Runde</span><span>Offen</span></div>'
+                ? '<div class="dt-player-head" aria-hidden="true"><span class="dt-player-head-title">Spieler</span><span>Gesamt</span><span>Aktuell</span><span>Offen</span></div>'
                 : (game.gameMode === 'cricket' ? '<div class="dt-player-head dt-player-head-cricket" aria-hidden="true"><span class="dt-player-head-title">Spieler</span><span>Punkte</span><span>Offen</span></div>' : (game.gameMode === 'around_clock' ? '<div class="dt-player-head" aria-hidden="true"><span class="dt-player-head-title">Spieler</span><span>Nächstes Ziel</span></div>' : '<h3>Spieler</h3>'))) +
               '<div class="dt-players">' +
               playersHtml(selectedGame, vm.inactiveRanges) +
               '</div>';
+            if (playerList && playerList.closest('.dt-side') && playerList.closest('.dt-side')._dtFitPlayerData) {
+              requestAnimationFrame(playerList.closest('.dt-side')._dtFitPlayerData);
+            }
           }
         };
       }
@@ -1752,7 +1989,7 @@ window.SRPluginViews = window.SRPluginViews || {};
   // Der Fullplay-Test sucht exakt nach:
   // SRPluginViews[PLUGIN_ID]
   window.SRPluginViews[PLUGIN_ID] = render;
-  window.SRPlugins[PLUGIN_ID] = { render: render };
+  window.SRPlugins[PLUGIN_ID] = { render: render, deactivate: deactivateDartsAudio };
 })();
 
 

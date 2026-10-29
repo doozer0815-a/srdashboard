@@ -1,0 +1,47 @@
+{
+  "type": "object",
+  "properties": {
+    "startingScore": {
+      "type": "integer",
+      "enum": [
+        301,
+        501,
+        701
+      ],
+      "title": "Start-Spiel"
+    },
+    "doubleIn": {
+      "type": "boolean",
+      "title": "Double-In"
+    },
+    "doubleOut": {
+      "type": "boolean",
+      "title": "Double-Out"
+    },
+    "orderMode": {
+      "type": "string",
+      "enum": [
+        "range",
+        "beginner"
+      ],
+      "title": "Spielerreihenfolge"
+    },
+    "beginnerRange": {
+      "type": "integer",
+      "minimum": 1,
+      "title": "Beginner-Stand"
+    },
+    "autoStartWhenAllReady": {
+      "type": "boolean",
+      "title": "Automatisch starten"
+    },
+    "gameMode": {
+      "type": "string",
+      "enum": [
+        "x01",
+        "cricket", "around_clock"
+      ],
+      "title": "Spielart"
+    }
+  }
+}

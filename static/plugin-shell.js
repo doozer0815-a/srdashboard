@@ -161,6 +161,30 @@ window.SRPluginShell = (function () {
   const loadedScripts = {}; // pluginId -> <script> element
   const loadingScripts = {}; // pluginId -> in-flight Promise
   const loadedThemes = {}; // pluginId -> <link> element
+  let activePluginId = '';
+
+  function deactivatePlugin(pluginId) {
+    if (!pluginId) return;
+    try {
+      const plugin = window.SRPlugins && window.SRPlugins[pluginId];
+      const view = window.SRPluginViews && window.SRPluginViews[pluginId];
+      const deactivate = (plugin && plugin.deactivate) || (view && view.deactivate);
+      if (typeof deactivate === 'function') deactivate();
+    } catch (err) {
+      console.warn('Plugin-Deaktivierung fehlgeschlagen:', pluginId, err);
+    }
+  }
+
+  function setActivePlugin(pluginId) {
+    const nextId = pluginId || '';
+    if (activePluginId && activePluginId !== nextId) deactivatePlugin(activePluginId);
+    activePluginId = nextId;
+  }
+
+  function deactivateActivePlugin() {
+    if (activePluginId) deactivatePlugin(activePluginId);
+    activePluginId = '';
+  }
 
   function removeTheme(pluginId) {
     const link = loadedThemes[pluginId];
@@ -237,6 +261,9 @@ window.SRPluginShell = (function () {
 
   async function renderPluginView(container, pluginId, viewUrl, assetsBase, viewModel, themeUrl) {
     if (!container) return;
+    // In einer Anzeige ist jeweils nur das aktive Plugin audio-/timerberechtigt.
+    // Bei einem Wechsel wird die vorherige View vor dem Rendern deaktiviert.
+    setActivePlugin(pluginId);
     try {
       if (container.dataset.pluginId !== pluginId) {
         container.innerHTML = '';
@@ -285,13 +312,18 @@ window.SRPluginShell = (function () {
 
   function clearCache(pluginId) {
     if (pluginId) {
+      if (activePluginId === pluginId) {
+        deactivatePlugin(pluginId);
+        activePluginId = '';
+      }
       removeScript(pluginId);
       removeTheme(pluginId);
     } else {
+      deactivateActivePlugin();
       Object.keys(loadedScripts).forEach(removeScript);
       Object.keys(loadedThemes).forEach(removeTheme);
     }
   }
 
-  return { renderPluginView, clearCache, ensureViewScript, ensureTheme, unloadOtherThemes };
+  return { renderPluginView, clearCache, ensureViewScript, ensureTheme, unloadOtherThemes, deactivateActivePlugin };
 })();

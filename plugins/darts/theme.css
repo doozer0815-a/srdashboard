@@ -15,54 +15,57 @@
 }
 .darts-view * { box-sizing: border-box; }
 #shared-master-host.darts-view { position: absolute; inset: 0; height: auto; min-height: 0; }
-.dt-layout { display:flex; flex-direction:column; height:100%; min-height:100%; }
+.dt-layout {
+    --dt-player-min-width: 500px;
+    container-type: inline-size;
+    container-name: dt-plugin; display:flex; flex-direction:column; height:100%; min-height:100%; }
 .dt-header { flex:0 0 auto; margin:.45rem .55rem 0; padding:.55rem .9rem; display:flex; gap:.7rem 1rem; align-items:center; flex-wrap:wrap; background:var(--dt-panel); border:1px solid var(--dt-line); border-radius:14px; }
 .dt-title { font-size:1.35rem; font-weight:800; }
 .dt-badge { padding:.18rem .55rem; border-radius:999px; background:#2c6f49; color:#fff; font-weight:700; font-size:.82rem; }
 .dt-status { margin-left:auto; font-weight:700; color:#fff; }
-.dt-main { flex:1; min-height:0; min-width:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,min(600px,42%)); gap:.55rem; padding:.5rem; }
+.dt-main { flex:1; min-height:0; min-width:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(var(--dt-player-min-width, 500px), min(600px, 42%)); gap:.55rem; padding:.5rem; }
 .dt-board-col, .dt-side { min-height:0; }
 .dt-board-col { display:flex; align-items:center; justify-content:center; background:var(--dt-panel); border:1px solid var(--dt-line); border-radius:16px; overflow:hidden; container-type:size; min-width:0; min-height:0; }
 /* Die Scheibe bleibt quadratisch und nutzt automatisch den kleineren verfügbaren Platz (Breite oder Höhe). */
 .dt-board-wrap { width:min(100cqw,100cqh); height:min(100cqw,100cqh); max-width:100%; max-height:100%; flex:0 1 auto; display:flex; align-items:center; justify-content:center; padding:.4rem; aspect-ratio:1 / 1; }
 .dt-board-svg { width:100%; height:100%; display:block; flex:0 0 auto; }
 
-.dt-side { display:flex; flex-direction:column; gap:.45rem; overflow:hidden; min-width:0; width:100%; max-width:600px; justify-self:stretch; }
-.dt-panel { background:var(--dt-panel); border:1px solid var(--dt-line); border-radius:14px; padding:.55rem .65rem; }
-.dt-panel h3 { margin:0 0 .35rem; font-size:.9rem; color:var(--dt-muted); }
-.dt-player-head { flex:0 0 auto; display:grid; grid-template-columns:9px minmax(0,1fr) auto auto auto; gap:.45rem; align-items:center; padding:0 .5rem .35rem; margin:0 0 .35rem; color:var(--dt-muted); font-size:.9rem; font-weight:800; }
+.dt-side { --dt-player-scale: 1; --dt-player-row-height: 54px; display:flex; flex-direction:column; gap:calc(.45rem * var(--dt-player-scale)); overflow:hidden; min-width:var(--dt-player-min-width, 500px); width:100%; max-width:none; justify-self:stretch; min-height:0; }
+.dt-panel { background:var(--dt-panel); border:1px solid var(--dt-line); border-radius:14px; padding:calc(.55rem * var(--dt-player-scale, 1)) calc(.65rem * var(--dt-player-scale, 1)); min-height:0; }
+[data-gameinfo], [data-history] { flex:0 0 auto; }
+[data-players] { display:flex; flex-direction:column; flex:1 1 0; overflow:hidden; }
+.dt-panel h3 { margin:0 0 calc(.35rem * var(--dt-player-scale, 1)); font-size:calc(.9rem * var(--dt-player-scale, 1)); color:var(--dt-muted); }
+.dt-player-head { flex:0 0 auto; display:grid; grid-template-columns:9px minmax(0,1fr) auto auto auto; gap:calc(.45rem * var(--dt-player-scale, 1)); align-items:center; padding:0 calc(.5rem * var(--dt-player-scale, 1)) calc(.35rem * var(--dt-player-scale, 1)); margin:0 0 calc(.35rem * var(--dt-player-scale, 1)); color:var(--dt-muted); font-size:calc(.9rem * var(--dt-player-scale, 1)); font-weight:800; }
 .dt-player-head span { min-width:0; }
-.dt-player-head .dt-player-head-title { grid-column:1 / 3; color:var(--dt-muted); font-size:.9rem; font-weight:800; }
+.dt-player-head .dt-player-head-title { grid-column:1 / 3; color:var(--dt-muted); font-size:calc(.9rem * var(--dt-player-scale, 1)); font-weight:800; }
 .dt-player-head span:nth-child(n+2) { text-align:right; min-width:3.5rem; }
 .dt-controls { display:flex; gap:.4rem; flex-wrap:wrap; align-items:center; }
 .dt-controls select, .dt-controls button { font:inherit; }
 .dt-controls select { min-height:2rem; background:#17202a; color:#fff; border:1px solid var(--dt-line); border-radius:8px; padding:.25rem .45rem; }
 .dt-controls button { border:0; border-radius:8px; padding:.4rem .7rem; cursor:pointer; font-weight:700; background:#2c6f49; color:#fff; }
 .dt-controls button.secondary { background:#36424e; }
-.dt-players { display:flex; flex-direction:column; gap:.35rem; overflow:auto; min-height:0; width:100%; max-width:100%; }
-.dt-player { min-height:54px; flex:0 0 auto; display:grid; grid-template-columns:9px minmax(0,1fr) auto auto auto; gap:.45rem; align-items:center; padding:.42rem .5rem; border:1px solid transparent; border-radius:10px; background:rgba(255,255,255,.035); }
+.dt-players { display:flex; flex-direction:column; gap:calc(.2rem * var(--dt-player-scale, 1)); overflow:hidden; min-height:0; flex:1 1 auto; width:100%; max-width:100%; }
+.dt-player { min-height:calc(var(--dt-player-row-height, 54px) * var(--dt-player-scale, 1)); height:calc(var(--dt-player-row-height, 54px) * var(--dt-player-scale, 1)); flex:0 0 auto; overflow:hidden; display:grid; grid-template-columns:calc(9px * var(--dt-player-scale, 1)) minmax(0,1fr) auto auto auto; gap:calc(.45rem * var(--dt-player-scale, 1)); align-items:center; padding:calc(.42rem * var(--dt-player-scale, 1)) calc(.5rem * var(--dt-player-scale, 1)); border:1px solid transparent; border-radius:10px; background:rgba(255,255,255,.035); }
 .dt-player.active { border-color:var(--dt-accent); box-shadow:0 0 0 1px rgba(232,185,35,.18), 0 0 18px rgba(232,185,35,.12); background:rgba(232,185,35,.11); }
 .dt-player.finished { opacity:.72; }
-.dt-swatch { width:9px; height:30px; border-radius:5px; }
-.dt-who { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:750; }
-.dt-score { font-size:1.35rem; font-weight:850; min-width:3.2rem; text-align:right; }
-.dt-stat { color:var(--dt-muted); font-size:.78rem; text-align:right; min-width:3.5rem; }
-.dt-stat strong { display:block; color:var(--dt-ink); font-size:.95rem; }
-.dt-darts { display:flex; gap:.25rem; flex-wrap:wrap; margin-top:.2rem; grid-column:2 / -1; }
-.dt-dart-chip { padding:.12rem .35rem; border-radius:6px; background:#1c2732; font-size:.76rem; color:#dfe6ed; }
+.dt-swatch { width:calc(9px * var(--dt-player-scale, 1)); height:calc(30px * var(--dt-player-scale, 1)); border-radius:5px; }
+.dt-who { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:calc(1rem * var(--dt-player-scale, 1)); font-weight:750; }
+.dt-score { font-size:calc(2.0rem * var(--dt-player-scale, 1)); font-weight:850; min-width:3.2rem; text-align:right; }
+.dt-stat { color:var(--dt-muted); font-size:calc(.78rem * var(--dt-player-scale, 1)); text-align:right; min-width:3.5rem; }
+.dt-stat strong { display:block; color:var(--dt-ink); font-size:calc(1.1rem * var(--dt-player-scale, 1)); }
+.dt-darts { display:flex; gap:.25rem; flex-wrap:wrap; margin-top:calc(.2rem * var(--dt-player-scale, 1)); grid-column:2 / -1; font-size:calc(1em * var(--dt-player-scale, 1)); }
+.dt-dart-chip { padding:calc(.12rem * var(--dt-player-scale, 1)) calc(.35rem * var(--dt-player-scale, 1)); border-radius:6px; background:#1c2732; font-size:calc(.76rem * var(--dt-player-scale, 1)); color:#dfe6ed; }
 .dt-dart-chip.blocked { opacity:.55; text-decoration:line-through; }
 .dt-open { color:#8fd3ad; }
-.dt-bust { color:var(--dt-bust); font-weight:800; }
-.dt-help { color:var(--dt-muted); font-size:.78rem; }
+.dt-bust { color:var(--dt-bust); font-weight:800; font-size:inherit; }
+.dt-help { color:var(--dt-muted); font-size:calc(.78rem * var(--dt-player-scale, 1)); }
 .dt-footer { flex:0 0 auto; margin:0 .55rem .45rem; padding:.35rem .7rem; background:var(--dt-panel); border:1px solid var(--dt-line); border-radius:12px; color:var(--dt-muted); font-size:.8rem; }
 .dt-message { padding:.55rem .65rem; border-radius:10px; background:rgba(212,90,90,.12); border:1px solid rgba(212,90,90,.28); color:#ffd3d3; }
-@media (max-width: 900px) {
-  .dt-players { width:100%; max-width:100%; }
-  .dt-main { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr) minmax(260px,.9fr); overflow:auto; }
-  .dt-board-col { container-type:size; }
-  .dt-board-wrap { width:min(100cqw,100cqh); height:min(100cqw,100cqh); }
-  .dt-status { width:100%; margin-left:0; }
-}
+.dt-layout.dt-stacked .dt-players { width:100%; max-width:100%; }
+.dt-layout.dt-stacked .dt-main { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr) minmax(260px,.9fr); overflow:auto; }\n.dt-layout.dt-stacked .dt-side { min-width:0; }
+.dt-layout.dt-stacked .dt-board-col { container-type:size; }
+.dt-layout.dt-stacked .dt-board-wrap { width:min(100cqw,100cqh); height:min(100cqw,100cqh); }
+.dt-layout.dt-stacked .dt-status { width:100%; margin-left:0; }
 
 /* Programmatisch gezeichnetes Dartboard.
    Optik orientiert sich an der gelieferten Dartboard.svg, die SVG-Datei
@@ -146,13 +149,13 @@
 
 /* Standard-Cricket-Ziele: drei Trefferleuchten je Zahl und Bull. */
 .dt-controls [data-x01-setting][hidden] { display:none !important; }
-.dt-cricket-marks { grid-column:2 / -1; display:grid; grid-template-columns:repeat(7, minmax(2.5rem, 3.25rem)); justify-content:start; gap:.08rem; margin-top:.35rem; width:100%; }
-.dt-cricket-target { min-width:0; display:flex; flex-direction:column; align-items:center; gap:.12rem; padding:.15rem .04rem; border-radius:5px; background:rgba(0,0,0,.18); }
-.dt-cricket-target-label { font-size:.75rem; font-weight:800; color:var(--dt-ink); }
-.dt-cricket-lights { display:flex; gap:.1rem; align-items:center; justify-content:center; }
-.dt-cricket-light { display:block; width:.48rem; height:.48rem; border-radius:50%; background:#26323b; border:1px solid #59636d; box-shadow:inset 0 0 2px rgba(0,0,0,.8); }
+.dt-cricket-marks { grid-column:2 / -1; display:grid; grid-template-columns:repeat(7, minmax(calc(2.5rem * var(--dt-player-scale, 1)), calc(3.25rem * var(--dt-player-scale, 1)))); justify-content:start; gap:calc(.08rem * var(--dt-player-scale, 1)); margin-top:calc(.35rem * var(--dt-player-scale, 1)); width:100%; }
+.dt-cricket-target { min-width:0; display:flex; flex-direction:column; align-items:center; gap:calc(.12rem * var(--dt-player-scale, 1)); padding:calc(.15rem * var(--dt-player-scale, 1)) calc(.04rem * var(--dt-player-scale, 1)); border-radius:5px; background:rgba(0,0,0,.18); }
+.dt-cricket-target-label { font-size:calc(.75rem * var(--dt-player-scale, 1)); font-weight:800; color:var(--dt-ink); }
+.dt-cricket-lights { display:flex; gap:calc(.1rem * var(--dt-player-scale, 1)); align-items:center; justify-content:center; }
+.dt-cricket-light { display:block; width:calc(.48rem * var(--dt-player-scale, 1)); height:calc(.48rem * var(--dt-player-scale, 1)); border-radius:50%; background:#26323b; border:1px solid #59636d; box-shadow:inset 0 0 2px rgba(0,0,0,.8); }
 .dt-cricket-light.lit { background:#35e878; border-color:#a4ffc2; box-shadow:0 0 5px rgba(53,232,120,.85), inset 0 0 2px rgba(255,255,255,.65); }
-@media (max-width:480px) { .dt-cricket-marks { grid-template-columns:repeat(7, minmax(2rem, 2.5rem)); gap:.04rem; } .dt-cricket-light { width:.38rem; height:.38rem; } }
+@media (max-width:480px) { .dt-cricket-marks { grid-template-columns:repeat(7, minmax(calc(2rem * var(--dt-player-scale, 1)), calc(2.5rem * var(--dt-player-scale, 1)))); gap:calc(.04rem * var(--dt-player-scale, 1)); } .dt-cricket-light { width:calc(.38rem * var(--dt-player-scale, 1)); height:calc(.38rem * var(--dt-player-scale, 1)); } }
 
 /* Cricket: Kopfzeile und Spielerwerte in drei klar ausgerichteten Spalten. */
 .dt-player-head-cricket { grid-template-columns:minmax(0,1fr) auto auto; gap:.45rem; padding-left:.5rem; }
@@ -166,7 +169,7 @@
 /* Cricket: Überschriften exakt über den jeweiligen Werten ausrichten. */
 .dt-player-head-cricket {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 3.5rem 3.5rem;
+  grid-template-columns: minmax(0, 1fr) calc(3.5rem * var(--dt-player-scale, 1)) calc(3.5rem * var(--dt-player-scale, 1));
   gap: .45rem;
   align-items: center;
 }
@@ -175,8 +178,8 @@
 .dt-player-head-cricket span:nth-child(3) { text-align: right; min-width: 0; }
 .dt-player.dt-player-cricket > div:nth-child(2) {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 3.5rem 3.5rem;
-  gap: .15rem .45rem;
+  grid-template-columns: minmax(0, 1fr) calc(3.5rem * var(--dt-player-scale, 1)) calc(3.5rem * var(--dt-player-scale, 1));
+  gap: calc(.15rem * var(--dt-player-scale, 1)) calc(.45rem * var(--dt-player-scale, 1));
   align-items: center;
   min-width: 0;
 }
@@ -192,7 +195,7 @@
 .dt-player-head-cricket {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) 3.5rem 3.5rem !important;
-  gap: .45rem !important;
+  gap: calc(.45rem * var(--dt-player-scale, 1)) !important;
   align-items: center;
 }
 .dt-player-head-cricket .dt-player-head-title { grid-column: 1; text-align: left; }
@@ -200,14 +203,24 @@
 .dt-player-head-cricket span:nth-child(3) { min-width: 0; text-align: right; }
 
 .dt-player.dt-player-cricket {
-  grid-template-columns: 9px minmax(0, 1fr) 3.5rem 3.5rem !important;
-  column-gap: .45rem;
-  row-gap: .2rem;
+  grid-template-columns: calc(9px * var(--dt-player-scale, 1)) minmax(0, 1fr) calc(3.5rem * var(--dt-player-scale, 1)) calc(3.5rem * var(--dt-player-scale, 1)) !important;
+  column-gap: calc(.45rem * var(--dt-player-scale, 1));
+  row-gap: calc(.2rem * var(--dt-player-scale, 1));
 }
 .dt-player.dt-player-cricket > div:nth-child(2) { display: contents !important; }
 .dt-player.dt-player-cricket .dt-who { grid-column: 2; grid-row: 1; min-width: 0; }
 .dt-player.dt-player-cricket .dt-score { grid-column: 3; grid-row: 1; min-width: 0; text-align: right; }
 .dt-player.dt-player-cricket .dt-stat.dt-open { grid-column: 4; grid-row: 1; min-width: 0; text-align: right; }
 .dt-player.dt-player-cricket .dt-darts { grid-column: 2 / -1; grid-row: 2; margin-top: 0; }
-.dt-player.dt-player-cricket .dt-cricket-marks { grid-column: 2 / -1; grid-row: 3; justify-content: start; margin-top: .25rem; }
+.dt-player.dt-player-cricket .dt-cricket-marks { grid-column: 2 / -1; grid-row: 3; justify-content: start; margin-top: calc(.25rem * var(--dt-player-scale, 1)); }
 .dt-player.dt-player-cricket > .dt-stat:not(.dt-open) { grid-column: 2 / -1; text-align: left; }
+
+
+/* X01: Ergebnis neben den Dart-Treffern ausgeben, ohne die bestehende Ergebnisfarbe zu ändern. */
+.dt-darts .dt-result {
+  display: inline-flex;
+  align-items: center;
+  font-size: calc(.76rem * var(--dt-player-scale, 1));
+  font-weight: 800;
+  padding: calc(.12rem * var(--dt-player-scale, 1)) calc(.1rem * var(--dt-player-scale, 1));
+}

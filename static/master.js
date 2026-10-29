@@ -503,6 +503,11 @@
   }
 
   async function activatePlugin(id) {
+    // Audio, Queues und Plugin-Timer beim Verlassen von darts sofort beenden,
+    // nicht erst nach der Antwort des Aktivierungs-Requests.
+    if (currentPluginId() !== (id || '') && window.SRPluginShell && window.SRPluginShell.deactivateActivePlugin) {
+      window.SRPluginShell.deactivateActivePlugin();
+    }
     // Optimistic isolation: drop prior plugin UI before the round-trip returns.
     mountGen += 1;
     activeMeta = { active: true, pluginId: id || '' };

@@ -89,6 +89,22 @@
       teilerBandDsg: 80,
       last10Max: 10.9,
       autoZoomPadFrac: 0.012
+    },
+    dartboard: {
+      id: 'dartboard',
+      label: 'Dartboard',
+      file: 'dartboard.svg',
+      targetDiameterMm: 140,
+      tenRingDiameterMm: 0,
+      innerTenDiameterMm: 0,
+      ringWidthMm: 0,
+      oneRingSvg: 0,
+      ring8RadiusMm: 0,
+      shotDiameterMm: 4.5,
+      decMax: 60,
+      coordRadiusMm: 90,
+      teilerBandDsg: 100,
+      last10Max: 60
     }
   };
 
